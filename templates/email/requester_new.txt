@@ -1,0 +1,12 @@
+{% autoescape off %}Hi {{ ticket.requester_name.split.0 }},
+
+We received your request. Your ticket number is #{{ ticket.number }}.
+
+"{{ ticket.summary }}"
+
+Check on it or reply here (keep this link private):
+{{ link }}
+
+— {{ org.name }} IT help desk{% if org.help_phone %}
+Urgent? Call {{ org.help_phone }}.{% endif %}
+{% endautoescape %}

@@ -1,0 +1,15 @@
+# Caddy is the front door: it gets the free HTTPS certificate,
+# redirects http:// to https://, and passes requests to the app.
+{$TIXSYS_DOMAIN} {
+	encode zstd gzip
+
+	request_body {
+		max_size 80MB
+	}
+
+	header {
+		-Server
+	}
+
+	reverse_proxy app:8000
+}

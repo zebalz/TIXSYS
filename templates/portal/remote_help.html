@@ -1,0 +1,38 @@
+{% extends "portal/base.html" %}
+{% block title %}Get remote help{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Get remote help</h1>
+  <p>A technician can see your screen and fix the problem with you. Call or message the help desk first so someone is ready{% if org.help_phone %}: {{ org.help_phone }}{% endif %}.</p>
+</div>
+
+<section class="panel" style="margin-bottom:1.5rem">
+  <h2 style="margin-bottom:.9rem">Quick Assist on Windows</h2>
+  <ol class="steps">
+    <li>Ask your technician for a 6-digit security code.</li>
+    <li>Open Quick Assist: press <span class="keys"><kbd>Ctrl</kbd> + <kbd>Windows key</kbd> + <kbd>Q</kbd></span>. Or select Start, type <b>Quick Assist</b>, and open it.</li>
+    <li>Under <b>Get help</b>, type the code and select <b>Submit</b>.</li>
+    <li>When it asks, select <b>Allow</b> so the technician can see your screen.</li>
+    <li>Stay at your computer. To end the session at any time, close Quick Assist.</li>
+  </ol>
+  {% if org.remote_help_text %}<div class="notice" style="margin:1rem 0 0">{{ org.remote_help_text|linebreaksbr }}</div>{% endif %}
+</section>
+
+<section>
+  <h2 style="margin-bottom:.4rem">Meet on Zoom</h2>
+  <p class="muted">Use this if a technician asked you to join their Zoom meeting.</p>
+  {% if techs %}
+  <ul class="tech-list">
+    {% for t in techs %}
+    <li>
+      <b>{{ t.display_name }}</b>
+      <a class="btn secondary small" href="{{ t.zoom_link }}" target="_blank" rel="noopener noreferrer">Join {{ t.first_name|default:t.username }}'s Zoom</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No Zoom links are set up yet. Call the help desk instead.</p>
+  {% endif %}
+</section>
+{% endblock %}

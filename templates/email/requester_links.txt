@@ -1,0 +1,7 @@
+{% autoescape off %}Here are your {{ org.portal_title }} tickets. Keep these links private.
+{% for ticket, link in links %}
+#{{ ticket.number }} — {{ ticket.summary }} ({{ ticket.status.name }})
+{{ link }}
+{% endfor %}
+— {{ org.name }} IT help desk
+{% endautoescape %}

@@ -1,0 +1,15 @@
+{% autoescape off %}Hi {{ ticket.requester_name.split.0 }},
+
+{% if note.kind == "resolution" %}Your ticket #{{ ticket.number }} has been resolved.
+
+How it was resolved:{% else %}{{ note.author_name }} replied to your ticket #{{ ticket.number }}:{% endif %}
+
+{{ note.body }}
+
+See the whole ticket or reply here (keep this link private):
+{{ link }}
+{% if note.kind == "resolution" %}
+Still not working? Reply on that page and the ticket opens again.
+{% endif %}
+— {{ org.name }} IT help desk
+{% endautoescape %}

@@ -1,0 +1,6 @@
+{% autoescape off %}{{ ticket.requester_name }} replied on ticket #{{ ticket.number }} ({{ ticket.summary }}):
+
+{{ note.body }}
+
+Open it: {{ link }}
+{% endautoescape %}

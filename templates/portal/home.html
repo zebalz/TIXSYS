@@ -1,0 +1,34 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ org.portal_title }}{% endblock %}
+{% block content %}
+<section class="hello">
+  <h1>How can IT help?</h1>
+  <p class="lead">Every request gets a ticket number, so you can check on it any time.</p>
+  {% if org.welcome_text %}<div class="notice">{{ org.welcome_text|linebreaksbr }}</div>{% endif %}
+</section>
+
+<div class="actions">
+  <a class="action primary" href="{% url 'portal:submit' %}">
+    <strong>Submit a ticket</strong>
+    <span>Tell us what's wrong. Add screenshots if you have them.</span>
+  </a>
+  <a class="action" href="{% url 'portal:remote_help' %}">
+    <strong>Get remote help</strong>
+    <span>Let a technician see your screen with Quick Assist or Zoom.</span>
+  </a>
+  <a class="action" href="{% url 'portal:my_tickets' %}">
+    <strong>My tickets</strong>
+    <span>Check on something you sent, or reply to it.</span>
+  </a>
+</div>
+
+{% if resources %}
+<section class="howto">
+  <h2>How-to articles</h2>
+  <ul>
+    {% for r in resources %}<li><a href="{% url 'portal:resource' r.id %}">{{ r.title }}</a></li>{% endfor %}
+  </ul>
+  <p style="margin-top:1rem"><a href="{% url 'portal:resources' %}">See all how-to articles</a></p>
+</section>
+{% endif %}
+{% endblock %}

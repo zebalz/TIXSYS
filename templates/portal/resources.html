@@ -1,0 +1,18 @@
+{% extends "portal/base.html" %}
+{% block title %}How-to articles{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>How-to articles</h1>
+  <p>Short guides for common problems. If one doesn't fix it, <a href="{% url 'portal:submit' %}">submit a ticket</a>.</p>
+</div>
+{% if resources %}
+<section class="howto">
+  <ul>
+    {% for r in resources %}<li><a href="{% url 'portal:resource' r.id %}">{{ r.title }}</a></li>{% endfor %}
+  </ul>
+</section>
+{% else %}
+<p>No articles yet.</p>
+{% endif %}
+{% endblock %}

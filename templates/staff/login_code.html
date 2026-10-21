@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Enter your code{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block body %}
+<main class="login-wrap" id="main">
+  <div class="login">
+    <p class="brand">{{ org.name }}</p>
+    <p class="sub">Open your authenticator app and enter the 6-digit code for this account.</p>
+    <form method="post" class="box">
+      {% csrf_token %}
+      {% include "partials/form_errors.html" %}
+      {% include "partials/field.html" with field=form.code %}
+      <button class="btn" type="submit">Verify and sign in</button>
+    </form>
+    <p class="small muted" style="margin-top:1rem">Lost your phone? Ask the administrator to turn off your authenticator app.<br><a href="{% url 'staff:login' %}">Start over</a></p>
+  </div>
+</main>
+{% endblock %}

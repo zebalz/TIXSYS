@@ -1,0 +1,61 @@
+{% extends "portal/base.html" %}
+{% block title %}Ticket #{{ ticket.number }}{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+<div class="ticket-head">
+  <span class="num">#{{ ticket.number }}</span>
+  <span class="status k-{{ ticket.status.kind }}">{{ ticket.status.name }}</span>
+</div>
+<p class="ticket-summary">{{ ticket.summary }}</p>
+<ul class="facts">
+  <li>Sent <b>{{ ticket.created_at|date:"M j, Y, g:i a" }}</b></li>
+  {% if ticket.category %}<li>About <b>{{ ticket.category }}</b></li>{% endif %}
+  <li>Technician <b>{% if ticket.assignee %}{{ ticket.assignee.first_name|default:ticket.assignee.username }}{% else %}not assigned yet{% endif %}</b></li>
+</ul>
+
+{% if resolution %}
+<section class="outcome">
+  <h2>How it was resolved</h2>
+  <div class="body" style="white-space:pre-wrap">{{ resolution.body }}</div>
+  <p class="small muted" style="margin:.75rem 0 0">Still not working? Reply below and the ticket opens again.</p>
+</section>
+{% endif %}
+
+<h2 style="margin-bottom:.75rem">Conversation</h2>
+<ol class="conversation">
+  <li class="msg"{% if not notes %} id="latest"{% endif %}>
+    <header><b>{{ ticket.requester_name }}</b><time datetime="{{ ticket.created_at|date:'c' }}">{{ ticket.created_at|date:"M j, g:i a" }}</time></header>
+    <div class="body">{{ ticket.description }}</div>
+    {% include "partials/files.html" with files=loose_files token=ticket.token %}
+  </li>
+  {% for note in notes %}
+  <li class="msg{% if not note.from_requester %} from-them{% endif %}{% if note.kind == 'resolution' %} resolution{% endif %}"{% if forloop.last %} id="latest"{% endif %}>
+    <header>
+      <b>{{ note.author_name }}{% if not note.from_requester %} (IT){% endif %}</b>
+      <time datetime="{{ note.created_at|date:'c' }}">{{ note.created_at|date:"M j, g:i a" }}</time>
+      {% if note.kind == 'resolution' %}<span class="tag">Resolution</span>{% endif %}
+    </header>
+    <div class="body">{{ note.body }}</div>
+    {% include "partials/files.html" with files=note.attachments.all token=ticket.token %}
+  </li>
+  {% endfor %}
+</ol>
+
+{% if closed %}
+<div class="notice">This ticket is closed. If you still need help, <a href="{% url 'portal:submit' %}">submit a new ticket</a>.</div>
+{% else %}
+<form method="post" enctype="multipart/form-data" class="panel" id="reply">
+  <h2 style="margin-bottom:1rem">Reply</h2>
+  {% csrf_token %}
+  {% include "partials/form_errors.html" %}
+  <div class="trap" aria-hidden="true"><label for="{{ form.leave_blank.id_for_label }}">Leave this empty</label>{{ form.leave_blank }}</div>
+  <input type="hidden" name="stamp" value="{{ stamp }}">
+  {% include "partials/field.html" with field=form.body %}
+  {% include "partials/field.html" with field=form.files %}
+  <div class="form-actions">
+    <button class="btn" type="submit">Send reply</button>
+    {% if ticket.status.is_done %}<span class="muted small">Replying opens the ticket again.</span>{% endif %}
+  </div>
+</form>
+{% endif %}
+{% endblock %}

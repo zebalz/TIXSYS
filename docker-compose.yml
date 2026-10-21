@@ -1,0 +1,77 @@
+# The whole help desk in one bundle: the app, its database, the web server
+# (Caddy, which also handles HTTPS), and the nightly backup.
+# Settings come from the .env file. Use ./tixsys instead of running this directly.
+
+name: tixsys
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tixsys
+      POSTGRES_USER: tixsys
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./tixsys setup first}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tixsys -d tixsys"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: tixsys
+      POSTGRES_USER: tixsys
+      MEDIA_ROOT: /data/media
+    volumes:
+      - media:/data/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      TIXSYS_DOMAIN: ${TIXSYS_DOMAIN:?Run ./tixsys setup first}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/backup-loop.sh"]
+    environment:
+      PGHOST: db
+      PGDATABASE: tixsys
+      PGUSER: tixsys
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_TIME_UTC: ${BACKUP_TIME_UTC:-10:00}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+    volumes:
+      - ./docker/backup-loop.sh:/backup-loop.sh:ro
+      - ./backups:/backups
+      - media:/data/media:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  media:
+  caddy_data:
+  caddy_config:

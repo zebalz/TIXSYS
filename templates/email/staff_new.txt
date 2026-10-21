@@ -1,0 +1,9 @@
+{% autoescape off %}New ticket #{{ ticket.number }} on {{ ticket.board }} ({{ ticket.get_priority_display }} priority)
+
+From: {{ ticket.requester_name }}{% if ticket.location %}, {{ ticket.location }}{% endif %}{% if ticket.requester_phone %}, {{ ticket.requester_phone }}{% endif %}
+Category: {{ ticket.category|default:"none" }}
+
+{{ ticket.description }}
+
+Open it: {{ link }}
+{% endautoescape %}

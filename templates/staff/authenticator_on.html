@@ -1,0 +1,17 @@
+{% extends "staff/base.html" %}
+{% block page_title %}Authenticator app{% endblock %}
+{% block content %}
+<div class="form-page">
+  <div class="work-head"><h1>Authenticator app is on</h1></div>
+  <form method="post" class="box">
+    <p>To turn it off, confirm your password. You'll then sign in with your password only.</p>
+    {% csrf_token %}
+    {% include "partials/form_errors.html" %}
+    {% include "partials/field.html" with field=form.password %}
+    <div class="form-actions">
+      <button class="btn danger" type="submit">Turn off authenticator app</button>
+      <a class="btn quiet" href="{% url 'staff:account' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

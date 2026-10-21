@@ -1,0 +1,10 @@
+{% extends "portal/base.html" %}
+{% block title %}Thanks{% endblock %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+<div class="panel">
+  <h1 style="font-size:2rem;margin-bottom:.75rem">Thanks</h1>
+  <p>Your request was received. If you don't hear back, call the help desk{% if org.help_phone %} at {{ org.help_phone }}{% endif %}.</p>
+  <a class="btn secondary" href="{% url 'portal:home' %}">Back to the help desk</a>
+</div>
+{% endblock %}

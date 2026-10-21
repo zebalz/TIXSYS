@@ -1,0 +1,11 @@
+<div class="field{% if field.errors %} has-error{% endif %}">
+{% if field.field.widget.input_type == "checkbox" %}
+  <label class="check" for="{{ field.id_for_label }}">{{ field }} {{ field.label }}</label>
+{% else %}
+  <label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} <span class="muted small">(optional)</span>{% endif %}</label>
+  {{ field }}
+{% endif %}
+{% if field.help_text %}<p class="help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+{% if field.name == "files" %}<p class="help">Images or PDFs, up to {{ max_attachments }} files, {{ max_attachment_mb }} MB each.</p>{% endif %}
+{{ field.errors }}
+</div>

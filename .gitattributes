@@ -1,0 +1,7 @@
+# Keep Unix line endings on scripts, even if edited on Windows.
+* text=auto
+tixsys text eol=lf
+*.sh text eol=lf
+docker/Caddyfile text eol=lf
+*.woff2 binary
+*.png binary

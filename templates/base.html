@@ -1,0 +1,17 @@
+{% load static desk %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="same-origin">
+<title>{% block title %}{{ org.portal_title }}{% endblock %} — {{ org.name }}</title>
+<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+<link rel="stylesheet" href="{% static 'css/tixsys.css' %}">
+<style>:root{--brand:{{ org.brand_color|default:'#2A5585' }};--brand-ink:{{ org.brand_color|default:'#2A5585'|readable_on }};--header:{{ org.header_color|default:'#17222E' }};--header-ink:{{ org.header_color|default:'#17222E'|readable_on }};}</style>
+{% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<a class="skip" href="#main">Skip to content</a>
+{% block body %}{% endblock %}
+</body>
+</html>

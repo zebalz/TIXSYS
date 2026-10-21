@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+# TIXSYS helper. Every command you need to run the help desk.
+# Run it from this folder:  ./tixsys help
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+say() { printf '%s\n' "$*"; }
+fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
+
+need_docker() {
+  command -v docker >/dev/null 2>&1 || fail "Docker isn't installed. See 'Put it on a server' in README.md."
+  docker compose version >/dev/null 2>&1 || fail "Docker Compose isn't available. Install the docker-compose-plugin package."
+  docker info >/dev/null 2>&1 || fail "Docker isn't running, or this account can't use it. Try again with sudo."
+}
+
+need_env() {
+  [ -f .env ] || fail "No .env file yet. Run ./tixsys setup first."
+}
+
+compose() { docker compose "$@"; }
+
+random_string() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$1"; }
+
+wait_for_app() {
+  printf 'Waiting for the app to start'
+  for _ in $(seq 1 90); do
+    if compose exec -T app python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)" >/dev/null 2>&1; then
+      say " ready."
+      return 0
+    fi
+    printf '.'
+    sleep 2
+  done
+  say ""
+  fail "The app didn't start. Run ./tixsys logs app to see why."
+}
+
+wait_for_db() {
+  printf 'Waiting for the database'
+  for _ in $(seq 1 60); do
+    if compose exec -T db pg_isready -U tixsys -d postgres >/dev/null 2>&1; then
+      say " ready."
+      return 0
+    fi
+    printf '.'
+    sleep 2
+  done
+  say ""
+  fail "The database didn't start. Run ./tixsys logs db to see why."
+}
+
+domain_from_env() { grep -E '^TIXSYS_DOMAIN=' .env | head -1 | cut -d= -f2-; }
+
+open_address() {
+  local d
+  d="$(domain_from_env)"
+  case "$d" in
+    http://*) say "$d" ;;
+    *) say "https://$d" ;;
+  esac
+}
+
+cmd_setup() {
+  need_docker
+  [ ! -f .env ] || fail ".env already exists, so setup already ran. Use ./tixsys start. (To start over, delete .env first. It holds your passwords.)"
+  local domain="${1:-}"
+  if [ -z "$domain" ]; then
+    say "What web address will the portal use? Example: help.example.org"
+    say "No domain yet? Type http:// and this server's IP address, e.g. http://203.0.113.10 (no HTTPS until you add a domain)."
+    read -rp "Address: " domain
+  fi
+  [ -n "$domain" ] || fail "No address given."
+  domain="${domain%/}"
+  case "$domain" in https://*) domain="${domain#https://}" ;; esac
+
+  cat > .env <<EOF
+# TIXSYS settings. Keep this file private: it holds passwords.
+# After changing it, run ./tixsys restart
+
+# The address people type to reach the portal.
+TIXSYS_DOMAIN=$domain
+
+# Secrets made by setup. Don't share them. Don't change them after setup.
+SECRET_KEY=$(random_string 60)
+POSTGRES_PASSWORD=$(random_string 32)
+
+TIME_ZONE=America/Los_Angeles
+
+# Nightly backup time in UTC (10:00 UTC is 3 AM in Los Angeles during summer time).
+BACKUP_TIME_UTC=10:00
+BACKUP_KEEP=14
+
+# Email is off until EMAIL_HOST is filled in. See README.md, "Turn on email".
+EMAIL_HOST=
+EMAIL_PORT=587
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+EMAIL_USE_TLS=1
+EMAIL_FROM=
+EOF
+  chmod 600 .env
+  mkdir -p backups
+  say "Saved settings to .env"
+  say "Building and starting. The first time takes a few minutes."
+  compose up -d --build
+  wait_for_app
+  say ""
+  say "Now create your administrator account (you'll pick a username and password)."
+  compose exec app python manage.py createsuperuser
+  say ""
+  say "Done. Open $(open_address)"
+  say "Staff sign in: $(open_address)/staff/"
+}
+
+cmd_start() { need_docker; need_env; compose up -d; wait_for_app; say "Running at $(open_address)"; }
+cmd_stop() { need_docker; need_env; compose down; say "Stopped. Your data is kept."; }
+cmd_restart() { need_docker; need_env; compose up -d --force-recreate; wait_for_app; }
+cmd_status() { need_docker; need_env; compose ps; }
+cmd_logs() { need_docker; need_env; compose logs -f --tail=200 "$@"; }
+
+cmd_admin() {
+  need_docker; need_env
+  say "Create an administrator account."
+  compose exec app python manage.py createsuperuser
+}
+
+cmd_password() {
+  need_docker; need_env
+  local user="${1:-}"
+  [ -n "$user" ] || fail "Usage: ./tixsys password <username>"
+  compose exec app python manage.py changepassword "$user"
+}
+
+cmd_unlock() {
+  need_docker; need_env
+  local user="${1:-}"
+  [ -n "$user" ] || fail "Usage: ./tixsys unlock <username>"
+  compose exec -T app python manage.py unlock_login "$user"
+}
+
+cmd_demo() {
+  need_docker; need_env
+  compose exec -T app python manage.py seed_demo
+}
+
+cmd_clear_demo() {
+  need_docker; need_env
+  read -rp "Delete all demo tickets and demo.* staff accounts? Real tickets are kept. Type yes: " answer
+  [ "$answer" = "yes" ] || { say "Stopped. Nothing changed."; exit 0; }
+  compose exec -T app python manage.py clear_demo --yes
+}
+
+cmd_backup() {
+  need_docker; need_env
+  mkdir -p backups
+  local stamp work out
+  stamp="$(date -u +%Y%m%d-%H%M%S)"
+  work="$(mktemp -d)"
+  # shellcheck disable=SC2064  # expand the path now, on purpose
+  trap "rm -rf '$work'" EXIT
+  say "Backing up the database..."
+  compose exec -T db sh -c 'pg_dump --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$work/db.sql"
+  say "Backing up uploaded files..."
+  compose exec -T app tar -C /data/media -cf - . > "$work/media.tar"
+  cp .env "$work/env"
+  say "tixsys backup $stamp (manual)" > "$work/manifest.txt"
+  out="backups/tixsys-backup-$stamp.tar.gz"
+  tar -C "$work" -czf "$out" db.sql media.tar env manifest.txt
+  chmod 600 "$out"
+  rm -rf "$work"
+  trap - EXIT
+  say "Saved: $out"
+  say "This file holds every ticket and the server's passwords. Keep it private."
+}
+
+cmd_restore() {
+  need_docker
+  local file="${1:-}"
+  [ -n "$file" ] && [ -f "$file" ] || fail "Usage: ./tixsys restore <backup-file.tar.gz>"
+  local work
+  work="$(mktemp -d)"
+  # shellcheck disable=SC2064  # expand the path now, on purpose
+  trap "rm -rf '$work'" EXIT
+  tar -C "$work" -xzf "$file" || fail "Couldn't open $file."
+  [ -f "$work/db.sql" ] && [ -f "$work/media.tar" ] || fail "$file isn't a TIXSYS backup."
+
+  if [ ! -f .env ]; then
+    if [ -f "$work/env" ]; then
+      cp "$work/env" .env
+      chmod 600 .env
+      say "Using the settings saved in the backup. Address: $(domain_from_env)"
+      say "(If this server has a different address, edit TIXSYS_DOMAIN in .env afterwards and run ./tixsys restart.)"
+    else
+      fail "There's no .env here and none in the backup. Run ./tixsys setup first, then restore."
+    fi
+  fi
+
+  say "This replaces ALL tickets, staff accounts and settings on this server with the backup."
+  read -rp "Type RESTORE to continue: " answer
+  [ "$answer" = "RESTORE" ] || { say "Stopped. Nothing changed."; exit 0; }
+
+  mkdir -p backups
+  compose build app
+  compose up -d db
+  wait_for_db
+  compose stop app caddy backup >/dev/null 2>&1 || true
+
+  say "Restoring the database..."
+  compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d postgres \
+    -c "DROP DATABASE IF EXISTS \"$POSTGRES_DB\" WITH (FORCE);" \
+    -c "CREATE DATABASE \"$POSTGRES_DB\" OWNER \"$POSTGRES_USER\";"'
+  compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$work/db.sql" >/dev/null
+
+  say "Restoring uploaded files..."
+  compose run --rm --no-deps -T --entrypoint sh app -c 'find /data/media -mindepth 1 -delete && tar -C /data/media -xf -' < "$work/media.tar"
+
+  compose up -d
+  wait_for_app
+  say "Restore finished. Open $(open_address)"
+}
+
+cmd_update() {
+  need_docker; need_env
+  say "Making a backup first..."
+  cmd_backup
+  git pull --ff-only
+  compose up -d --build
+  wait_for_app
+  say "Updated."
+}
+
+cmd_test() {
+  need_docker; need_env
+  compose exec -T app python manage.py test helpdesk
+}
+
+cmd_help() {
+  cat <<'EOF'
+TIXSYS help desk. Commands:
+
+  ./tixsys setup [address]   First-time setup: makes .env, starts everything, creates your admin account
+  ./tixsys start             Start the help desk
+  ./tixsys stop              Stop it (your data is kept)
+  ./tixsys restart           Restart after changing .env
+  ./tixsys status            Show what's running
+  ./tixsys logs [app|db|caddy|backup]   Show recent logs (Ctrl+C to stop watching)
+
+  ./tixsys admin             Create another administrator account
+  ./tixsys password <user>   Set a new password for a staff account
+  ./tixsys unlock <user>     Unlock a staff account after too many failed sign-ins
+
+  ./tixsys demo              Add fake staff and tickets (for testing and demos)
+  ./tixsys clear-demo        Remove the fake staff and tickets (real ones are kept)
+
+  ./tixsys backup            Save everything to one file in backups/
+  ./tixsys restore <file>    Load a backup file (also how you move to a new server)
+  ./tixsys update            Back up, download the newest version, and restart
+  ./tixsys test              Run the automated checks
+EOF
+}
+
+command="${1:-help}"
+shift || true
+case "$command" in
+  setup) cmd_setup "$@" ;;
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  restart) cmd_restart ;;
+  status) cmd_status ;;
+  logs) cmd_logs "$@" ;;
+  admin) cmd_admin ;;
+  password) cmd_password "$@" ;;
+  unlock) cmd_unlock "$@" ;;
+  demo) cmd_demo ;;
+  clear-demo) cmd_clear_demo ;;
+  backup) cmd_backup ;;
+  restore) cmd_restore "$@" ;;
+  update) cmd_update ;;
+  test) cmd_test ;;
+  help|-h|--help) cmd_help ;;
+  *) say "Unknown command: $command"; cmd_help; exit 1 ;;
+esac

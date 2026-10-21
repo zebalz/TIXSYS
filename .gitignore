@@ -1,0 +1,12 @@
+# Secrets and data: never commit these.
+.env
+backups/
+media/
+
+# Build output
+staticfiles/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store

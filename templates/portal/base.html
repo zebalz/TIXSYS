@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load static %}
+{% block body_class %}portal{% endblock %}
+{% block body %}
+<header class="portal-header">
+  <div class="inner">
+    <a class="portal-brand" href="{% url 'portal:home' %}">
+      {% if org.logo %}<img src="{% url 'portal:logo' %}" alt="">{% endif %}
+      <span class="names"><span class="org">{{ org.name }}</span><span class="title">{{ org.portal_title }}</span></span>
+    </a>
+    <nav aria-label="Help desk">
+      <a class="wide-only" href="{% url 'portal:submit' %}">Submit a ticket</a>
+      <a href="{% url 'portal:my_tickets' %}">My tickets</a>
+    </nav>
+  </div>
+</header>
+<main id="main" class="portal-main {% block main_class %}{% endblock %}">
+  {% include "partials/messages.html" %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="portal-footer">
+  <span>{% if org.help_phone %}Urgent? Call the help desk at <a href="tel:{{ org.help_phone }}">{{ org.help_phone }}</a>.{% else %}{{ org.name }} IT help desk{% endif %}</span>
+  <a href="{% url 'staff:login' %}">Staff sign in</a>
+</footer>
+<script src="{% static 'js/portal.js' %}" defer></script>
+{% endblock %}

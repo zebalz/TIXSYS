@@ -1,0 +1,29 @@
+{% extends "staff/base.html" %}
+{% block page_title %}Log a call{% endblock %}
+{% block content %}
+<div class="form-page">
+  <div class="work-head"><h1>Log a call</h1></div>
+  <p class="muted" style="margin-top:-.5rem">For calls, texts and walk-ups. The ticket gets a number and full history like any other.</p>
+  <form method="post" enctype="multipart/form-data" class="box">
+    {% csrf_token %}
+    {% include "partials/form_errors.html" %}
+    <div class="grid-2">
+      {% include "partials/field.html" with field=form.source %}
+      {% include "partials/field.html" with field=form.requester_name %}
+      {% include "partials/field.html" with field=form.requester_phone %}
+      {% include "partials/field.html" with field=form.requester_email %}
+      {% include "partials/field.html" with field=form.location %}
+      {% include "partials/field.html" with field=form.board %}
+      {% include "partials/field.html" with field=form.category %}
+      {% include "partials/field.html" with field=form.priority %}
+    </div>
+    {% include "partials/field.html" with field=form.description %}
+    {% include "partials/field.html" with field=form.files %}
+    {% include "partials/field.html" with field=form.assign_to_me %}
+    <div class="form-actions">
+      <button class="btn" type="submit">Log ticket</button>
+      <a class="btn quiet" href="{% url 'staff:tickets' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

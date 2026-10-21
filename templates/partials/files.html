@@ -1,0 +1,11 @@
+{% if files %}
+<ul class="files">
+{% for a in files %}
+  {% if token %}{% url 'portal:attachment' token a.id as file_url %}{% else %}{% url 'staff:attachment' a.id as file_url %}{% endif %}
+  <li><a href="{{ file_url }}"{% if a.is_image %} target="_blank" rel="noopener"{% endif %} title="{{ a.original_name }}">
+    {% if a.is_image %}<img src="{{ file_url }}" alt="" loading="lazy">{% else %}<span class="doc">PDF</span>{% endif %}
+    <span class="name">{{ a.original_name }}</span>
+  </a></li>
+{% endfor %}
+</ul>
+{% endif %}

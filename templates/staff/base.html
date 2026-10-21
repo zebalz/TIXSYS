@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{% block page_title %}Workspace{% endblock %}{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block body %}
+<div class="app" id="app" data-poll-url="{% url 'staff:poll' %}" data-list-url="{% url 'staff:tickets' %}">
+  <aside class="side">
+    <div class="brand"><b>{{ org.name }}</b><span>Help desk workspace</span></div>
+    <nav aria-label="Workspace">
+      <a href="{% url 'staff:tickets' %}"{% if nav == 'tickets' %} aria-current="page"{% endif %}>Tickets <span class="new-badge" id="new-badge" hidden></span></a>
+      <a href="{% url 'staff:log_call' %}"{% if nav == 'log' %} aria-current="page"{% endif %}>Log a call</a>
+      {% if user.is_supervisor %}<a href="{% url 'staff:reports' %}"{% if nav == 'reports' %} aria-current="page"{% endif %}>Reports</a>{% endif %}
+      {% if user.is_admin_role %}<a href="/staff/settings/">Settings</a>{% endif %}
+      <a href="{% url 'staff:account' %}"{% if nav == 'account' %} aria-current="page"{% endif %}>My account</a>
+    </nav>
+    <div class="alert-box">
+      <button class="btn" type="button" id="alerts-toggle" aria-pressed="false">Turn on alerts</button>
+      <p id="alerts-note">Sound and a desktop notification when a new ticket comes in.</p>
+    </div>
+    <div class="who">
+      <b>{{ user.display_name }}</b>{{ user.get_role_display }}
+      <form method="post" action="{% url 'staff:logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+    </div>
+  </aside>
+  <main class="work" id="main">
+    <div class="new-banner" id="new-banner" role="status">
+      <span id="new-banner-text"></span>
+      <a class="btn small" href="{% url 'staff:tickets' %}?view=unassigned">Show unassigned tickets</a>
+    </div>
+    {% include "partials/messages.html" %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="{% static 'js/staff.js' %}" defer></script>
+{% endblock %}
