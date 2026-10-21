@@ -1,10 +1,8 @@
-{% extends "admin/base.html" %}{% load static %}
+{% extends "admin/base.html" %}
 {% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title }}{% endblock %}
 {% block extrastyle %}{{ block.super }}<style>
-@font-face { font-family: "Hanken Grotesk"; font-weight: 400; font-display: swap; src: url("{% static 'fonts/hanken-grotesk-latin-400-normal.woff2' %}") format("woff2"); }
-@font-face { font-family: "Hanken Grotesk"; font-weight: 600; font-display: swap; src: url("{% static 'fonts/hanken-grotesk-latin-600-normal.woff2' %}") format("woff2"); }
 :root, html[data-theme="light"] {
-  --font-family-primary: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-family-primary: Arial, "Helvetica Neue", Helvetica, sans-serif;
   --primary: #eeebff; --secondary: #f7f6fa; --accent: #5a48c6; --primary-fg: #26232f;
   --header-bg: #f7f6fa; --header-color: #5e5a6b; --header-branding-color: #26232f; --header-link-color: #26232f;
   --breadcrumbs-bg: #ffffff; --breadcrumbs-fg: #8d8a99; --breadcrumbs-link-fg: #5a48c6;

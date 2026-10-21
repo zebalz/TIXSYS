@@ -7,14 +7,12 @@
 </div>
 
 <section class="card">
-  <h2 style="margin-bottom:.75rem">Quick Assist on Windows</h2>
-  <ol class="steps">
-    <li>Ask your technician for a 6-digit security code.</li>
-    <li>Open Quick Assist: press <span class="keys"><kbd>Ctrl</kbd> + <kbd>Windows key</kbd> + <kbd>Q</kbd></span>. Or select Start, type <b>Quick Assist</b>, and open it.</li>
-    <li>Under <b>Get help</b>, type the code and select <b>Submit</b>.</li>
-    <li>When it asks, select <b>Allow</b> so the technician can see your screen.</li>
-    <li>Stay at your computer. To end the session at any time, close Quick Assist.</li>
-  </ol>
+  <h2 style="margin-bottom:.4rem">Quick Assist on Windows</h2>
+  <p class="muted small">Try the button first. If your browser asks to open Quick Assist, choose Open. If nothing happens, follow the pictures.</p>
+  <div class="actions-row" style="margin:0 0 1.25rem">
+    <a class="btn" href="ms-quick-assist:">Open Quick Assist</a>
+  </div>
+  {% include "portal/quick_assist_steps.html" %}
   {% if org.remote_help_text %}<div class="notice" style="margin:1rem 0 0">{{ org.remote_help_text|linebreaksbr }}</div>{% endif %}
 </section>
 

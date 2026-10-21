@@ -1,14 +1,6 @@
 /* TIXSYS — minimal, pastel. One stylesheet for the employee portal and the staff workspace.
-   The font is served from this server (no outside requests). */
+   Uses the fonts already on every computer (Arial / Helvetica), so nothing is downloaded. */
 
-@font-face { font-family: "Hanken Grotesk"; font-weight: 400; font-style: normal; font-display: swap;
-  src: url("../fonts/hanken-grotesk-latin-400-normal.woff2") format("woff2"); }
-@font-face { font-family: "Hanken Grotesk"; font-weight: 500; font-style: normal; font-display: swap;
-  src: url("../fonts/hanken-grotesk-latin-500-normal.woff2") format("woff2"); }
-@font-face { font-family: "Hanken Grotesk"; font-weight: 600; font-style: normal; font-display: swap;
-  src: url("../fonts/hanken-grotesk-latin-600-normal.woff2") format("woff2"); }
-@font-face { font-family: "Hanken Grotesk"; font-weight: 700; font-style: normal; font-display: swap;
-  src: url("../fonts/hanken-grotesk-latin-700-normal.woff2") format("woff2"); }
 
 :root {
   --bg: #ffffff;
@@ -45,7 +37,8 @@
   --pill: 999px;
   --shadow: 0 1px 2px rgba(38, 35, 47, 0.04), 0 10px 30px rgba(38, 35, 47, 0.07);
   --focus: color-mix(in srgb, var(--accent) 70%, #7c6cf0);
-  --font: "Hanken Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-narrow: "Arial Narrow", "Helvetica Neue Condensed", Arial, sans-serif;
   color-scheme: light;
 }
 
@@ -61,6 +54,7 @@ a { color: inherit; text-underline-offset: 3px; text-decoration-color: var(--lin
 a:hover { text-decoration-color: currentColor; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
 h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -0.01em; }
+h1, .ticket-card .num, .stat b, .thread-head .num { font-family: var(--font-narrow); }
 h1 { font-size: 1.75rem; font-weight: 600; }
 h2 { font-size: 1.15rem; font-weight: 600; }
 h3 { font-size: 1rem; font-weight: 600; }
@@ -499,3 +493,27 @@ table.plain { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
   .tickets .num { width: 3.25rem; }
   .filters select { min-width: 0; flex: 1 1 40%; }
 }
+
+/* Quick Assist picture guide */
+.qa-steps { list-style: none; counter-reset: qa; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.qa-steps li { counter-increment: qa; background: var(--bg); border-radius: var(--r); padding: 0.6rem 0.6rem 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.qa-steps svg { width: 100%; height: auto; display: block; margin-bottom: 0.4rem; }
+.qa-steps b { font-weight: 700; padding: 0 0.35rem; }
+.qa-steps b::before { content: counter(qa) ". "; color: var(--lilac-ink); }
+.qa-steps span { color: var(--ink-2); font-size: 0.875rem; padding: 0 0.35rem; }
+.qa-bg { fill: var(--lilac); }
+.qa-key rect { fill: #fff; stroke: var(--line-2); stroke-width: 1.5; }
+.qa-key text { font: 700 17px var(--font); fill: var(--ink); text-anchor: middle; }
+.qa-hot rect, rect.qa-hot { fill: var(--ink); stroke: var(--ink); }
+.qa-key.qa-hot text { fill: #fff; }
+.qa-plus { font: 700 20px var(--font); fill: var(--ink-3); text-anchor: middle; }
+.qa-win { fill: #fff; stroke: var(--line-2); }
+.qa-title { font: 11px var(--font); fill: var(--ink-3); }
+.qa-head { font: 700 14px var(--font); fill: var(--ink); }
+.qa-input { fill: #fff; stroke: var(--lilac-ink); stroke-width: 2; }
+.qa-code { font: 700 14px var(--font); fill: var(--ink); letter-spacing: 2px; }
+.qa-btn { fill: var(--soft); stroke: var(--line-2); }
+.qa-btn-text { font: 700 11px var(--font); fill: #fff; text-anchor: middle; }
+.qa-btn-text.dark { fill: var(--ink); }
+.qa-line { fill: var(--soft); }
+@media (max-width: 760px) { .qa-steps { grid-template-columns: 1fr; } }
