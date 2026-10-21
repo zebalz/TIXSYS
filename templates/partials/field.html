@@ -6,6 +6,5 @@
   {{ field }}
 {% endif %}
 {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
-{% if field.name == "files" %}<p class="help">Images or PDFs, up to {{ max_attachments }} files, {{ max_attachment_mb }} MB each.</p>{% endif %}
 {{ field.errors }}
 </div>

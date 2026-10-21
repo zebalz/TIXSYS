@@ -1,7 +1,7 @@
 {% extends "staff/base.html" %}{% load desk %}
 {% block page_title %}Reports{% endblock %}
 {% block content %}
-<div class="work-head"><h1>Reports</h1></div>
+<div class="page-head"><h1>Reports</h1></div>
 
 <div class="stats">
   <div class="stat"><b>{{ open_total }}</b><span>Open tickets now</span></div>
@@ -11,21 +11,21 @@
 </div>
 
 <div class="report-grid">
-  <section class="box">
+  <section class="panel">
     <h2>Open by board</h2>
     {% if by_board %}<ul class="barlist">{% for r in by_board %}<li><span>{{ r.label }}</span><span class="n">{{ r.n }}</span><span class="bar"><i style="width:{{ r.pct }}%"></i></span></li>{% endfor %}</ul>{% else %}<p class="muted">No open tickets.</p>{% endif %}
   </section>
-  <section class="box">
+  <section class="panel">
     <h2>Open by status</h2>
     {% if by_status %}<ul class="barlist">{% for r in by_status %}<li><span>{{ r.label }}</span><span class="n">{{ r.n }}</span><span class="bar"><i style="width:{{ r.pct }}%"></i></span></li>{% endfor %}</ul>{% else %}<p class="muted">No open tickets.</p>{% endif %}
   </section>
-  <section class="box">
+  <section class="panel">
     <h2>Open by assignee</h2>
     {% if by_assignee %}<ul class="barlist">{% for r in by_assignee %}<li><span>{{ r.label }}</span><span class="n">{{ r.n }}</span><span class="bar"><i style="width:{{ r.pct }}%"></i></span></li>{% endfor %}</ul>{% else %}<p class="muted">No open tickets.</p>{% endif %}
   </section>
 </div>
 
-<section class="box chart-box" style="margin-bottom:1.5rem">
+<section class="panel chart-box" style="margin-bottom:1.75rem">
   <h2>Opened and resolved per week</h2>
   <div class="legend" aria-hidden="true"><span><i class="opened"></i>Opened</span><span><i class="resolved"></i>Resolved</span></div>
   <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-labelledby="week-chart-title">
@@ -44,7 +44,7 @@
       <text class="axis-label" x="{{ g.center }}" y="{{ chart.label_y }}" text-anchor="middle">{{ g.label }}</text>
     </g>
     {% endfor %}
-    <line x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ chart.base }}" y2="{{ chart.base }}" stroke="#b4c0cc" stroke-width="1"></line>
+    <line x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ chart.base }}" y2="{{ chart.base }}" stroke="#d6d3e0" stroke-width="1"></line>
   </svg>
   <details style="margin-top:.75rem">
     <summary>Show as a table</summary>
@@ -55,10 +55,10 @@
   </details>
 </section>
 
-<section class="box">
+<section class="panel">
   <h2>Oldest open tickets</h2>
   {% if oldest %}
-  <div class="table-wrap" style="border:0">
+  <div class="table-wrap">
   <table class="tickets">
     <thead><tr><th scope="col">#</th><th scope="col">Summary</th><th scope="col">Board</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Age</th></tr></thead>
     <tbody>
@@ -66,8 +66,8 @@
       <tr>
         <td class="num"><a href="{% url 'staff:ticket' t.number %}">{{ t.number }}</a></td>
         <td class="sum"><a href="{% url 'staff:ticket' t.number %}">{{ t.summary }}</a><span class="who">{{ t.requester_name }}</span></td>
-        <td>{{ t.board.name }}</td>
-        <td><span class="status k-{{ t.status.kind }}">{{ t.status.name }}</span></td>
+        <td class="muted">{{ t.board.name }}</td>
+        <td><span class="pill k-{{ t.status.kind }}">{{ t.status.name }}</span></td>
         <td>{% if t.assignee %}{{ t.assignee.display_name }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td class="age">{{ t.created_at|age }}</td>
       </tr>

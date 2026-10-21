@@ -40,3 +40,13 @@ def initials(user):
     first = (user.first_name or user.username or "?")[:1]
     last = (user.last_name or "")[:1]
     return (first + last).upper()
+
+
+@register.filter
+def name_initials(name):
+    """Initials from a plain name like "Marcus Bell" -> "MB"."""
+    parts = [p for p in str(name or "").split() if p]
+    if not parts:
+        return "?"
+    letters = parts[0][:1] + (parts[-1][:1] if len(parts) > 1 else "")
+    return letters.upper()

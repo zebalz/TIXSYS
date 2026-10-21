@@ -121,6 +121,16 @@ class PortalTests(Base):
         mine = self.client.get(reverse("portal:my_tickets"))
         self.assertContains(mine, "Printer won&#x27;t print")
 
+    def test_home_is_the_ticket_form_and_lists_recent_tickets(self):
+        home = self.client.get("/")
+        self.assertContains(home, "What do you need help with?")
+        self.assertNotContains(home, "Recent tickets")
+        self.assertRedirects(self.client.get(reverse("portal:submit")), reverse("portal:home"))
+        self.submit()
+        home = self.client.get("/")
+        self.assertContains(home, "Recent tickets")
+        self.assertContains(home, "Printer won&#x27;t print")
+
     def test_second_ticket_gets_next_number(self):
         self.submit()
         self.submit(description="Second problem")

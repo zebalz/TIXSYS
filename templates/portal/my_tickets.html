@@ -1,43 +1,43 @@
 {% extends "portal/base.html" %}
 {% block title %}My tickets{% endblock %}
-{% block main_class %}narrow{% endblock %}
 {% block content %}
-<div class="page-head">
+<div class="thread-head">
   <h1>My tickets</h1>
-  <p>Tickets sent or opened in this browser.</p>
+  <p class="muted" style="margin:.4rem 0 0">Tickets sent or opened in this browser.</p>
 </div>
 
 {% if tickets %}
-<ul class="ticket-list">
+<ul class="list">
   {% for t in tickets %}
   <li><a href="{% url 'portal:ticket' t.token %}">
     <span class="n">#{{ t.number }}</span>
-    <span><span class="sum">{{ t.summary }}</span><span class="when">Sent {{ t.created_at|date:"M j, Y" }}</span></span>
-    <span class="status k-{{ t.status.kind }}">{{ t.status.name }}</span>
+    <span class="t">{{ t.summary }}</span>
+    <span class="when">{{ t.created_at|date:"M j" }}</span>
+    <span class="pill k-{{ t.status.kind }}">{{ t.status.name }}</span>
   </a></li>
   {% endfor %}
 </ul>
 {% else %}
-<div class="panel" style="margin-bottom:2rem">
+<div class="card">
   <p>No tickets in this browser yet. If you sent one from another computer or phone, open it from {% if email_enabled %}the link in your email{% else %}the link you got when you sent it{% endif %}.</p>
-  <a class="btn" href="{% url 'portal:submit' %}">Submit a ticket</a>
+  <a class="btn" href="{% url 'portal:home' %}">New ticket</a>
 </div>
 {% endif %}
 
 {% if email_enabled %}
-<section class="panel">
-  <h2 style="margin-bottom:.5rem">Email me links to all my tickets</h2>
+<section class="card" style="margin-top:2rem">
+  <h2 style="margin-bottom:.4rem">Email me links to all my tickets</h2>
   {% if sent %}
-  <div class="notice" style="margin:0">If there are tickets for that address, the links are on their way. Check your email.</div>
+  <p style="margin:0">If there are tickets for that address, the links are on their way. Check your email.</p>
   {% else %}
-  <p>We'll send links to every ticket sent with your email address.</p>
+  <p class="muted">We'll send links to every ticket sent with your email address.</p>
   <form method="post">
     {% csrf_token %}
     {% include "partials/form_errors.html" %}
     <div class="trap" aria-hidden="true"><label for="{{ form.leave_blank.id_for_label }}">Leave this empty</label>{{ form.leave_blank }}</div>
     <input type="hidden" name="stamp" value="{{ stamp }}">
     {% include "partials/field.html" with field=form.email %}
-    <button class="btn secondary" type="submit">Email me my links</button>
+    <button class="btn" type="submit">Email me my links</button>
   </form>
   {% endif %}
 </section>

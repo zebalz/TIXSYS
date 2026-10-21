@@ -2,16 +2,17 @@
 {% block page_title %}Set up authenticator app{% endblock %}
 {% block content %}
 <div class="form-page">
-  <div class="work-head"><h1>Set up authenticator app</h1></div>
-  <section class="box">
+  <a class="back" href="{% url 'staff:account' %}"><svg class="i"><use href="#i-chevron"/></svg>My account</a>
+  <div class="page-head"><h1>Set up authenticator app</h1></div>
+  <section class="card" style="padding-bottom:1.25rem">
     <ol class="steps">
       <li>Open an authenticator app on your phone (Microsoft Authenticator, Google Authenticator, or similar).</li>
       <li>Add an account and scan this code.
-        <div class="qr" style="margin:.75rem 0">{{ qr|safe }}</div>
-        <span class="small muted">Can't scan? Type this key in the app instead:</span><br>
+        <div class="qr" style="margin:.85rem 0">{{ qr|safe }}</div>
+        <span class="small">Can't scan? Type this key in the app instead:</span><br>
         <span class="secret">{{ secret }}</span>
       </li>
-      <li>Enter the 6-digit code the app shows.</li>
+      <li style="margin-top:.75rem">Enter the 6-digit code the app shows.</li>
     </ol>
     <form method="post" style="margin-top:1rem;max-width:320px">
       {% csrf_token %}
@@ -19,7 +20,7 @@
       {% include "partials/field.html" with field=form.code %}
       <div class="form-actions">
         <button class="btn" type="submit">Turn on</button>
-        <a class="btn quiet" href="{% url 'staff:account' %}">Cancel</a>
+        <a class="btn ghost" href="{% url 'staff:account' %}">Cancel</a>
       </div>
     </form>
   </section>

@@ -1,44 +1,34 @@
-// Staff workspace: new-ticket alerts, copy buttons, note form helpers.
+// Staff workspace: new-ticket alerts, note types, filter changes.
 (function () {
   "use strict";
 
   var app = document.getElementById("app");
   if (!app) return;
 
-  // ---- Copy buttons ---------------------------------------------------------
-  document.addEventListener("click", function (event) {
-    var button = event.target.closest("[data-copy]");
-    if (!button) return;
-    var input = document.getElementById(button.getAttribute("data-copy"));
-    if (!input) return;
-    var original = button.getAttribute("data-label") || button.textContent;
-    button.setAttribute("data-label", original);
-    function done() {
-      button.textContent = "Copied";
-      setTimeout(function () { button.textContent = original; }, 2000);
-    }
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(input.value).then(done, function () { input.select(); });
-    } else {
-      input.select();
-      try { document.execCommand("copy"); done(); } catch (e) { /* selected for manual copy */ }
-    }
+  // ---- Filters apply as soon as one changes ---------------------------------
+  document.querySelectorAll("form[data-autosubmit] select").forEach(function (select) {
+    select.addEventListener("change", function () { select.form.submit(); });
   });
 
-  // ---- Note form: "waiting on employee" only makes sense for discussion notes
+  // ---- Note composer: show what each note type does --------------------------
+  var noteBox = document.getElementById("note-box");
   var waitingWrap = document.getElementById("waiting-wrap");
-  if (waitingWrap) {
-    var radios = document.querySelectorAll('input[name="kind"]');
+  var hint = document.getElementById("kind-hint");
+  if (noteBox) {
     var sync = function () {
       var checked = document.querySelector('input[name="kind"]:checked');
-      var show = !checked || checked.value === "discussion";
-      waitingWrap.hidden = !show;
-      if (!show) {
-        var box = waitingWrap.querySelector("input[type=checkbox]");
-        if (box) box.checked = false;
+      var kind = checked ? checked.value : "discussion";
+      noteBox.className = noteBox.className.replace(/\bk-\w+/g, "").trim() + " k-" + kind;
+      if (hint && hint.getAttribute("data-" + kind)) hint.textContent = hint.getAttribute("data-" + kind);
+      if (waitingWrap) {
+        waitingWrap.hidden = kind !== "discussion";
+        if (kind !== "discussion") {
+          var box = waitingWrap.querySelector("input[type=checkbox]");
+          if (box) box.checked = false;
+        }
       }
     };
-    radios.forEach(function (r) { r.addEventListener("change", sync); });
+    document.querySelectorAll('input[name="kind"]').forEach(function (r) { r.addEventListener("change", sync); });
     sync();
   }
 
@@ -94,15 +84,14 @@
 
   function renderToggle() {
     if (!toggle) return;
-    toggle.setAttribute("aria-pressed", alertsOn ? "true" : "false");
-    toggle.textContent = alertsOn ? "Alerts are on" : "Turn on alerts";
+    toggle.setAttribute("aria-checked", alertsOn ? "true" : "false");
     if (!note) return;
     if (!alertsOn) {
-      note.textContent = "Sound and a desktop notification when a new ticket comes in.";
+      note.textContent = "Chime and desktop notice";
     } else if (audio && audio.state === "running") {
-      note.textContent = "You'll hear a chime and see a notification. Keep this tab open.";
+      note.textContent = "On. Keep this tab open.";
     } else {
-      note.textContent = "Click anywhere on the page once so the browser allows the chime.";
+      note.textContent = "On. Click the page once to allow sound.";
     }
   }
 
@@ -122,7 +111,7 @@
   }
   // Browsers only allow sound after the person interacts with the page.
   ["pointerdown", "keydown"].forEach(function (type) {
-    document.addEventListener(type, function once() {
+    document.addEventListener(type, function () {
       if (alertsOn) { ensureAudio(); setTimeout(renderToggle, 50); }
     }, { once: true });
   });
@@ -132,10 +121,10 @@
     document.title = "(" + unseen + ") " + baseTitle;
     if (badge) { badge.hidden = false; badge.textContent = String(unseen); }
     if (banner && bannerText) {
-      var first = tickets[tickets.length - 1];
+      var last = tickets[tickets.length - 1];
       bannerText.textContent = unseen === 1
-        ? "New ticket #" + first.number + ": " + first.summary
-        : unseen + " new tickets came in. Latest: #" + first.number + " " + first.summary;
+        ? "New ticket #" + last.number + ": " + last.summary
+        : unseen + " new tickets came in. Latest: #" + last.number + " " + last.summary;
       banner.classList.add("show");
     }
     if (!alertsOn) return;
@@ -143,7 +132,7 @@
     if ("Notification" in window && Notification.permission === "granted") {
       tickets.slice(-3).forEach(function (t) {
         try {
-          var n = new Notification("New ticket #" + t.number + " — " + t.board, {
+          var n = new Notification("New ticket #" + t.number + " on " + t.board, {
             body: t.summary + "\nFrom " + t.requester,
             tag: "tixsys-" + t.number
           });
@@ -157,7 +146,7 @@
     var url = pollUrl + (latestId === null ? "?after=999999999999" : "?after=" + latestId);
     fetch(url, { credentials: "same-origin", headers: { "Accept": "application/json" } })
       .then(function (r) {
-        if (r.status === 401 || r.status === 403 || r.redirected) throw new Error("signed out");
+        if (!r.ok || r.redirected) throw new Error("not signed in");
         return r.json();
       })
       .then(function (data) {

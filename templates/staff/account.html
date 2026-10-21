@@ -2,9 +2,9 @@
 {% block page_title %}My account{% endblock %}
 {% block content %}
 <div class="form-page">
-  <div class="work-head"><h1>My account</h1></div>
-  <form method="post" class="box" style="margin-bottom:1rem">
-    <h2>Profile</h2>
+  <div class="page-head"><h1>My account</h1></div>
+  <form method="post" class="card">
+    <h2 style="margin-bottom:1rem">Profile</h2>
     {% csrf_token %}
     {% include "partials/form_errors.html" %}
     <div class="grid-2">
@@ -15,19 +15,21 @@
     </div>
     {% include "partials/field.html" with field=form.zoom_link %}
     {% include "partials/field.html" with field=form.email_alerts %}
-    <button class="btn" type="submit">Save profile</button>
+    <div class="form-actions"><button class="btn" type="submit">Save profile</button></div>
   </form>
 
-  <section class="box">
-    <h2>Sign-in security</h2>
-    <dl style="margin-bottom:1rem">
-      <dt>Username</dt><dd>{{ user.username }}</dd>
-      <dt>Role</dt><dd>{{ user.get_role_display }}</dd>
-      <dt>Authenticator app</dt><dd>{% if user.totp_enabled %}On — a code is required at sign-in{% else %}Off{% endif %}</dd>
-    </dl>
-    <div class="row-actions">
-      <a class="btn secondary small" href="{% url 'staff:password' %}">Change password</a>
-      <a class="btn secondary small" href="{% url 'staff:authenticator' %}">{% if user.totp_enabled %}Turn off authenticator app{% else %}Set up authenticator app{% endif %}</a>
+  <section class="card">
+    <h2 style="margin-bottom:1rem">Sign-in security</h2>
+    <div class="panel" style="padding:0;background:none">
+      <dl style="margin-bottom:1.25rem">
+        <dt>Username</dt><dd>{{ user.username }}</dd>
+        <dt>Role</dt><dd>{{ user.get_role_display }}</dd>
+        <dt>Authenticator app</dt><dd>{% if user.totp_enabled %}On. A code is needed at sign-in.{% else %}Off{% endif %}</dd>
+      </dl>
+    </div>
+    <div class="form-actions">
+      <a class="btn ghost small" href="{% url 'staff:password' %}">Change password</a>
+      <a class="btn ghost small" href="{% url 'staff:authenticator' %}">{% if user.totp_enabled %}Turn off authenticator app{% else %}Set up authenticator app{% endif %}</a>
     </div>
   </section>
 </div>

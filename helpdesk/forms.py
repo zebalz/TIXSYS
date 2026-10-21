@@ -53,13 +53,22 @@ class SubmitTicketForm(SpamCheckMixin):
         help_text="Building, floor or room, so a tech can find you.",
     )
     category = forms.ModelChoiceField(
-        label="What is it about?", queryset=Category.objects.none(), empty_label="Choose one", required=True
+        label="What's it about?",
+        queryset=Category.objects.none(),
+        widget=forms.RadioSelect,
+        error_messages={"required": "Pick what it's about."},
     )
     description = forms.CharField(
         label="What's going on?",
         max_length=8000,
-        widget=forms.Textarea(attrs={"rows": 7}),
-        help_text="What you were doing, what happened, and any error message you saw.",
+        widget=forms.Textarea(
+            attrs={
+                "rows": 2,
+                "data-autogrow": "",
+                "placeholder": "What's going on? Say what you were doing and any error message you saw.",
+            }
+        ),
+        error_messages={"required": "Describe the problem first."},
     )
     files = AttachmentsField(label="Screenshots")
 
@@ -80,7 +89,12 @@ class SubmitTicketForm(SpamCheckMixin):
 
 
 class ReplyForm(SpamCheckMixin):
-    body = forms.CharField(label="Your reply", max_length=8000, widget=forms.Textarea(attrs={"rows": 4}))
+    body = forms.CharField(
+        label="Your reply",
+        max_length=8000,
+        widget=forms.Textarea(attrs={"rows": 1, "data-autogrow": "", "placeholder": "Reply to the help desk"}),
+        error_messages={"required": "Type a reply first."},
+    )
     files = AttachmentsField(label="Add screenshots")
 
 
@@ -182,15 +196,20 @@ class NoteForm(forms.Form):
     kind = forms.ChoiceField(
         label="Note type",
         choices=[
-            (Note.DISCUSSION, "Discussion — the employee sees it"),
-            (Note.INTERNAL, "Internal — staff only"),
-            (Note.RESOLUTION, "Resolution — the employee sees it, and the ticket is resolved"),
+            (Note.DISCUSSION, "Discussion"),
+            (Note.INTERNAL, "Internal"),
+            (Note.RESOLUTION, "Resolution"),
         ],
         initial=Note.DISCUSSION,
         widget=forms.RadioSelect,
     )
-    body = forms.CharField(label="Note", max_length=8000, widget=forms.Textarea(attrs={"rows": 5}))
-    mark_waiting = forms.BooleanField(label="Set status to waiting on employee", required=False)
+    body = forms.CharField(
+        label="Note",
+        max_length=8000,
+        widget=forms.Textarea(attrs={"rows": 2, "data-autogrow": "", "placeholder": "Write a note"}),
+        error_messages={"required": "Write the note first."},
+    )
+    mark_waiting = forms.BooleanField(label="Waiting on employee", required=False)
     files = AttachmentsField(label="Files")
 
 

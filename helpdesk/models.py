@@ -8,7 +8,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
-hex_color = RegexValidator(r"^#[0-9A-Fa-f]{6}$", "Use a 6-digit hex color like #2A5585.")
+hex_color = RegexValidator(r"^#[0-9A-Fa-f]{6}$", "Use a 6-digit hex color like #26232F.")
 
 
 def new_ticket_token():
@@ -25,10 +25,14 @@ class Organization(models.Model):
     portal_title = models.CharField("Portal title", max_length=120, default="IT Help Desk")
     logo = models.ImageField(upload_to="branding/", blank=True, help_text="PNG or JPG. Shown in the portal header.")
     brand_color = models.CharField(
-        max_length=7, default="#2A5585", validators=[hex_color], help_text="Buttons and links, e.g. #2A5585."
+        "Button color", max_length=7, default="#26232F", validators=[hex_color], help_text="Main buttons, e.g. #26232F."
     )
     header_color = models.CharField(
-        max_length=7, default="#17222E", validators=[hex_color], help_text="Portal header background, e.g. #17222E."
+        "Accent color",
+        max_length=7,
+        default="#CFC6FF",
+        validators=[hex_color],
+        help_text="A soft color mixed into the background gradients, e.g. #CFC6FF.",
     )
     help_phone = models.CharField(
         "Help desk phone", max_length=60, blank=True, help_text="Shown on the portal for urgent problems."

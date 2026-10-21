@@ -1,34 +1,48 @@
 {% extends "portal/base.html" %}
 {% block title %}{{ org.portal_title }}{% endblock %}
+{% block glow %}<div class="glow" aria-hidden="true"></div>{% endblock %}
 {% block content %}
-<section class="hello">
-  <h1>How can IT help?</h1>
-  <p class="lead">Every request gets a ticket number, so you can check on it any time.</p>
+<form method="post" action="{% url 'portal:submit' %}" enctype="multipart/form-data" class="ask" id="ticket-form">
+  {% csrf_token %}
+  <h1>What do you need help with?</h1>
+  <p class="lead">Describe the problem like you'd tell a coworker. You'll get a ticket number right away.</p>
   {% if org.welcome_text %}<div class="notice">{{ org.welcome_text|linebreaksbr }}</div>{% endif %}
-</section>
+  {% if form.non_field_errors %}{% include "partials/form_errors.html" %}{% endif %}
 
-<div class="actions">
-  <a class="action primary" href="{% url 'portal:submit' %}">
-    <strong>Submit a ticket</strong>
-    <span>Tell us what's wrong. Add screenshots if you have them.</span>
-  </a>
-  <a class="action" href="{% url 'portal:remote_help' %}">
-    <strong>Get remote help</strong>
-    <span>Let a technician see your screen with Quick Assist or Zoom.</span>
-  </a>
-  <a class="action" href="{% url 'portal:my_tickets' %}">
-    <strong>My tickets</strong>
-    <span>Check on something you sent, or reply to it.</span>
-  </a>
-</div>
+  <div class="trap" aria-hidden="true"><label for="{{ form.leave_blank.id_for_label }}">Leave this empty</label>{{ form.leave_blank }}</div>
+  <input type="hidden" name="stamp" value="{{ stamp }}">
 
-{% if resources %}
-<section class="howto">
-  <h2>How-to articles</h2>
-  <ul>
-    {% for r in resources %}<li><a href="{% url 'portal:resource' r.id %}">{{ r.title }}</a></li>{% endfor %}
-  </ul>
-  <p style="margin-top:1rem"><a href="{% url 'portal:resources' %}">See all how-to articles</a></p>
-</section>
-{% endif %}
+  <div class="composer{% if form.description.errors %} has-error{% endif %}">
+    <label class="visually-hidden" for="{{ form.description.id_for_label }}">What's going on?</label>
+    {{ form.description }}
+    <div class="composer-bar">
+      <label class="icon-btn" for="{{ form.files.id_for_label }}" title="Attach screenshots"><svg class="i"><use href="#i-plus"/></svg><span class="visually-hidden">Attach screenshots (images or PDFs, up to {{ max_attachments }} files, {{ max_attachment_mb }} MB each)</span></label>
+      {{ form.files }}
+      <ul class="file-list" data-file-list="{{ form.files.id_for_label }}"></ul>
+      <span class="grow"></span>
+      <button class="send-btn" type="submit" title="Send ticket"><svg class="i"><use href="#i-send"/></svg><span class="visually-hidden">Send ticket</span></button>
+    </div>
+  </div>
+  {{ form.description.errors }}{{ form.files.errors }}
+
+  <p class="chips-label" id="category-label">{{ form.category.label }}</p>
+  <div class="chips" role="radiogroup" aria-labelledby="category-label">
+    {% for radio in form.category %}<label for="{{ radio.id_for_label }}">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}
+  </div>
+  {{ form.category.errors }}
+
+  <section class="details" aria-labelledby="details-title">
+    <div class="details-head"><h2 id="details-title">Your details</h2><span>This computer remembers them for next time.</span></div>
+    <div class="grid-2">
+      {% include "partials/field.html" with field=form.name %}
+      {% include "partials/field.html" with field=form.email %}
+      {% include "partials/field.html" with field=form.phone %}
+      {% include "partials/field.html" with field=form.location %}
+    </div>
+  </section>
+
+  <div class="actions-row" style="justify-content:center">
+    <button class="btn" type="submit">Send ticket</button>
+  </div>
+</form>
 {% endblock %}

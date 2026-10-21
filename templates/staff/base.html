@@ -1,34 +1,50 @@
-{% extends "base.html" %}{% load static %}
+{% extends "base.html" %}{% load static desk %}
 {% block title %}{% block page_title %}Workspace{% endblock %}{% endblock %}
 {% block body_class %}staff{% endblock %}
 {% block body %}
-<div class="app" id="app" data-poll-url="{% url 'staff:poll' %}" data-list-url="{% url 'staff:tickets' %}">
-  <aside class="side">
-    <div class="brand"><b>{{ org.name }}</b><span>Help desk workspace</span></div>
+<div class="shell" id="app" data-poll-url="{% url 'staff:poll' %}">
+  <aside class="side" id="side" aria-label="Workspace menu">
+    <a class="side-brand" href="{% url 'staff:tickets' %}">
+      {% if org.logo %}<img src="{% url 'portal:logo' %}" alt="">{% else %}<span class="mark" aria-hidden="true"></span>{% endif %}
+      <span class="names"><b>{{ org.name }}</b><span>Help desk workspace</span></span>
+    </a>
     <nav aria-label="Workspace">
-      <a href="{% url 'staff:tickets' %}"{% if nav == 'tickets' %} aria-current="page"{% endif %}>Tickets <span class="new-badge" id="new-badge" hidden></span></a>
-      <a href="{% url 'staff:log_call' %}"{% if nav == 'log' %} aria-current="page"{% endif %}>Log a call</a>
-      {% if user.is_supervisor %}<a href="{% url 'staff:reports' %}"{% if nav == 'reports' %} aria-current="page"{% endif %}>Reports</a>{% endif %}
-      {% if user.is_admin_role %}<a href="/staff/settings/">Settings</a>{% endif %}
-      <a href="{% url 'staff:account' %}"{% if nav == 'account' %} aria-current="page"{% endif %}>My account</a>
+      <a class="side-link" href="{% url 'staff:tickets' %}"{% if nav == 'tickets' %} aria-current="page"{% endif %}><svg class="i"><use href="#i-ticket"/></svg>Tickets<span class="new-badge" id="new-badge" hidden></span></a>
+      <a class="side-link" href="{% url 'staff:log_call' %}"{% if nav == 'log' %} aria-current="page"{% endif %}><svg class="i"><use href="#i-phone"/></svg>Log a call</a>
+      {% if user.is_supervisor %}<a class="side-link" href="{% url 'staff:reports' %}"{% if nav == 'reports' %} aria-current="page"{% endif %}><svg class="i"><use href="#i-chart"/></svg>Reports</a>{% endif %}
+      {% if user.is_admin_role %}<a class="side-link" href="/staff/settings/"><svg class="i"><use href="#i-sliders"/></svg>Settings</a>{% endif %}
+      <a class="side-link" href="{% url 'staff:account' %}"{% if nav == 'account' %} aria-current="page"{% endif %}><svg class="i"><use href="#i-user"/></svg>My account</a>
     </nav>
-    <div class="alert-box">
-      <button class="btn" type="button" id="alerts-toggle" aria-pressed="false">Turn on alerts</button>
-      <p id="alerts-note">Sound and a desktop notification when a new ticket comes in.</p>
-    </div>
-    <div class="who">
-      <b>{{ user.display_name }}</b>{{ user.get_role_display }}
-      <form method="post" action="{% url 'staff:logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+
+    <div class="side-foot">
+      <div class="switch-row">
+        <span>New-ticket alerts<small id="alerts-note">Chime and desktop notice</small></span>
+        <button class="switch" type="button" role="switch" aria-checked="false" id="alerts-toggle"><span class="visually-hidden">New-ticket alerts</span></button>
+      </div>
+      <div class="side-user">
+        <span class="avatar">{{ user|initials }}</span>
+        <span class="who"><b>{{ user.display_name }}</b><span>{{ user.get_role_display }}</span></span>
+        <form method="post" action="{% url 'staff:logout' %}">{% csrf_token %}<button class="icon-btn" type="submit" title="Sign out"><svg class="i"><use href="#i-out"/></svg><span class="visually-hidden">Sign out</span></button></form>
+      </div>
     </div>
   </aside>
-  <main class="work" id="main">
-    <div class="new-banner" id="new-banner" role="status">
-      <span id="new-banner-text"></span>
-      <a class="btn small" href="{% url 'staff:tickets' %}?view=unassigned">Show unassigned tickets</a>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" type="button" data-menu aria-controls="side" aria-expanded="false"><svg class="i"><use href="#i-menu"/></svg><span class="visually-hidden">Menu</span></button>
+      <b>{{ org.name }}</b>
+      <a class="btn small" href="{% url 'staff:log_call' %}">Log a call</a>
     </div>
-    {% include "partials/messages.html" %}
-    {% block content %}{% endblock %}
-  </main>
+    <main class="content wide" id="main">
+      <div class="new-banner" id="new-banner" role="status">
+        <span id="new-banner-text"></span>
+        <a class="btn small" href="{% url 'staff:tickets' %}?view=unassigned">Show unassigned</a>
+      </div>
+      {% include "partials/messages.html" %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </div>
+<script src="{% static 'js/common.js' %}" defer></script>
 <script src="{% static 'js/staff.js' %}" defer></script>
 {% endblock %}

@@ -2,20 +2,20 @@
 {% block title %}Staff sign in{% endblock %}
 {% block body_class %}staff{% endblock %}
 {% block body %}
-<main class="login-wrap" id="main">
+<main class="login-page" id="main">
   <div class="login">
-    <p class="brand">{{ org.name }}</p>
-    <p class="sub">Help desk workspace</p>
-    <form method="post" class="box">
+    <h1>Sign in</h1>
+    <p class="sub">{{ org.name }} help desk workspace</p>
+    <form method="post">
       {% csrf_token %}
       {% include "partials/messages.html" %}
       {% include "partials/form_errors.html" %}
       <input type="hidden" name="next" value="{{ next }}">
       {% include "partials/field.html" with field=form.username %}
       {% include "partials/field.html" with field=form.password %}
-      <button class="btn" type="submit">Sign in</button>
+      <button class="btn block" type="submit">Sign in</button>
     </form>
-    <p class="small muted" style="margin-top:1rem">Forgot your password? Ask the administrator to reset it.<br><a href="{% url 'portal:home' %}">Go to the employee portal</a></p>
+    <p class="foot">Forgot your password? Ask the administrator to reset it.<br><a href="{% url 'portal:home' %}">Go to the employee portal</a></p>
   </div>
 </main>
 {% endblock %}

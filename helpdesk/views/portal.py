@@ -40,14 +40,34 @@ def _remember(response, request, token):
     return response
 
 
+def sidebar_tickets(request):
+    """The tickets this browser has sent or opened, newest first (for the portal sidebar)."""
+    tokens = _mine_tokens(request)
+    current = getattr(request, "portal_current_token", None)
+    if current and current not in tokens:
+        tokens.insert(0, current)  # opened from a link for the first time
+    if not tokens:
+        return []
+    found = {
+        t.token: t
+        for t in Ticket.objects.filter(organization=request.org, token__in=tokens).select_related("status")
+    }
+    return [found[t] for t in tokens if t in found]
+
+
+def _home(request, form, status=200):
+    return render(request, "portal/home.html", {"form": form, "stamp": form_stamp(), "page": "new"}, status=status)
+
+
 def home(request):
-    resources = Resource.objects.filter(organization=request.org, is_published=True)[:8]
-    return render(request, "portal/home.html", {"resources": resources})
+    return _home(request, SubmitTicketForm(org=request.org))
 
 
 @require_http_methods(["GET", "POST"])
 def submit(request):
     org = request.org
+    if request.method == "GET":
+        return redirect("portal:home")
     if request.method == "POST":
         form = SubmitTicketForm(request.POST, request.FILES, org=org)
         if form.looks_like_spam():
@@ -74,9 +94,7 @@ def submit(request):
                 )
                 response = redirect("portal:received", token=ticket.token)
                 return _remember(response, request, ticket.token)
-    else:
-        form = SubmitTicketForm(org=org)
-    return render(request, "portal/submit.html", {"form": form, "stamp": form_stamp()})
+    return _home(request, form)
 
 
 def _ticket_for_token(request, token):
@@ -89,13 +107,15 @@ def _ticket_for_token(request, token):
 
 def received(request, token):
     ticket = _ticket_for_token(request, token)
+    request.portal_current_token = ticket.token
     link = request.build_absolute_uri(reverse("portal:ticket", args=[ticket.token]))
-    return render(request, "portal/received.html", {"ticket": ticket, "link": link})
+    return render(request, "portal/received.html", {"ticket": ticket, "link": link, "current_ticket": ticket})
 
 
 @require_http_methods(["GET", "POST"])
 def ticket(request, token):
     ticket = _ticket_for_token(request, token)
+    request.portal_current_token = ticket.token
     closed = ticket.status.kind == "closed"
     if request.method == "POST":
         form = ReplyForm(request.POST, request.FILES)
@@ -129,6 +149,7 @@ def ticket(request, token):
             "form": form,
             "stamp": form_stamp(),
             "closed": closed,
+            "current_ticket": ticket,
         },
     )
     return _remember(response, request, ticket.token)
@@ -157,14 +178,7 @@ def file_response(att):
 @require_http_methods(["GET", "POST"])
 def my_tickets(request):
     org = request.org
-    tokens = _mine_tokens(request)
-    tickets = []
-    if tokens:
-        found = {
-            t.token: t
-            for t in Ticket.objects.filter(organization=org, token__in=tokens).select_related("status")
-        }
-        tickets = [found[t] for t in tokens if t in found]
+    tickets = sidebar_tickets(request)
 
     sent = False
     form = EmailLinksForm()
@@ -184,23 +198,23 @@ def my_tickets(request):
     return render(
         request,
         "portal/my_tickets.html",
-        {"tickets": tickets, "form": form, "sent": sent, "stamp": form_stamp()},
+        {"tickets": tickets, "form": form, "sent": sent, "stamp": form_stamp(), "page": "mine"},
     )
 
 
 def remote_help(request):
     techs = User.objects.filter(organization=request.org, is_active=True).exclude(zoom_link="")
-    return render(request, "portal/remote_help.html", {"techs": techs})
+    return render(request, "portal/remote_help.html", {"techs": techs, "page": "remote"})
 
 
 def resources(request):
     items = Resource.objects.filter(organization=request.org, is_published=True)
-    return render(request, "portal/resources.html", {"resources": items})
+    return render(request, "portal/resources.html", {"resources": items, "page": "howto"})
 
 
 def resource(request, resource_id):
     item = get_object_or_404(Resource, pk=resource_id, organization=request.org, is_published=True)
-    return render(request, "portal/resource.html", {"resource": item})
+    return render(request, "portal/resource.html", {"resource": item, "page": "howto"})
 
 
 def logo(request):

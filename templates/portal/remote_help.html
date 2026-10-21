@@ -1,14 +1,13 @@
-{% extends "portal/base.html" %}
+{% extends "portal/base.html" %}{% load desk %}
 {% block title %}Get remote help{% endblock %}
-{% block main_class %}narrow{% endblock %}
 {% block content %}
-<div class="page-head">
-  <h1>Get remote help</h1>
-  <p>A technician can see your screen and fix the problem with you. Call or message the help desk first so someone is ready{% if org.help_phone %}: {{ org.help_phone }}{% endif %}.</p>
+<div class="thread-head">
+  <h1>Remote help</h1>
+  <p class="muted" style="margin:.4rem 0 0">A technician can see your screen and fix the problem with you. Call or message the help desk first so someone is ready{% if org.help_phone %}: {{ org.help_phone }}{% endif %}.</p>
 </div>
 
-<section class="panel" style="margin-bottom:1.5rem">
-  <h2 style="margin-bottom:.9rem">Quick Assist on Windows</h2>
+<section class="card">
+  <h2 style="margin-bottom:.75rem">Quick Assist on Windows</h2>
   <ol class="steps">
     <li>Ask your technician for a 6-digit security code.</li>
     <li>Open Quick Assist: press <span class="keys"><kbd>Ctrl</kbd> + <kbd>Windows key</kbd> + <kbd>Q</kbd></span>. Or select Start, type <b>Quick Assist</b>, and open it.</li>
@@ -19,20 +18,21 @@
   {% if org.remote_help_text %}<div class="notice" style="margin:1rem 0 0">{{ org.remote_help_text|linebreaksbr }}</div>{% endif %}
 </section>
 
-<section>
-  <h2 style="margin-bottom:.4rem">Meet on Zoom</h2>
-  <p class="muted">Use this if a technician asked you to join their Zoom meeting.</p>
+<section class="card">
+  <h2 style="margin-bottom:.25rem">Meet on Zoom</h2>
+  <p class="muted small" style="margin:0">Use this if a technician asked you to join their Zoom meeting.</p>
   {% if techs %}
-  <ul class="tech-list">
+  <ul class="people">
     {% for t in techs %}
     <li>
+      <span class="avatar">{{ t|initials }}</span>
       <b>{{ t.display_name }}</b>
-      <a class="btn secondary small" href="{{ t.zoom_link }}" target="_blank" rel="noopener noreferrer">Join {{ t.first_name|default:t.username }}'s Zoom</a>
+      <a class="btn ghost small" href="{{ t.zoom_link }}" target="_blank" rel="noopener noreferrer"><svg class="i"><use href="#i-video"/></svg>Join Zoom</a>
     </li>
     {% endfor %}
   </ul>
   {% else %}
-  <p>No Zoom links are set up yet. Call the help desk instead.</p>
+  <p style="margin:.75rem 0 0">No Zoom links are set up yet. Call the help desk instead.</p>
   {% endif %}
 </section>
 {% endblock %}

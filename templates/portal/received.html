@@ -1,36 +1,33 @@
 {% extends "portal/base.html" %}
 {% block title %}Ticket #{{ ticket.number }} received{% endblock %}
-{% block main_class %}narrow{% endblock %}
 {% block content %}
-<div class="stub">
-  <div class="stub-main">
-    <h1>We've got it, {{ ticket.requester_name.split.0 }}.</h1>
-    <p>Your ticket is in the help desk queue.{% if email_enabled and ticket.requester_email %} We also emailed the link below to {{ ticket.requester_email }}.{% endif %}</p>
-  </div>
-  <div class="stub-number">
-    <span class="label">Ticket</span>
-    <span class="num">#{{ ticket.number }}</span>
-  </div>
+<div class="ticket-card">
+  <span class="label">Your ticket number</span>
+  <span class="num">#{{ ticket.number }}</span>
+  <p>We've got it, {{ ticket.requester_name.split.0 }}.{% if email_enabled and ticket.requester_email %} We also emailed the link below to {{ ticket.requester_email }}.{% endif %}</p>
 </div>
 
-<section class="panel">
+<section class="section">
   <h2>Keep this link</h2>
-  <p style="margin-top:.5rem">It opens your ticket so you can check on it and reply. Anyone with the link can see the ticket, so don't post it anywhere public.</p>
+  <p class="muted">It opens your ticket so you can check on it and reply. Anyone with the link can see the ticket, so keep it to yourself.</p>
   <div class="linkbox">
     <input id="private-link" type="text" value="{{ link }}" readonly aria-label="Private link to your ticket">
-    <button class="btn secondary" type="button" data-copy="private-link">Copy link</button>
+    <button class="btn small" type="button" data-copy="private-link"><svg class="i"><use href="#i-copy"/></svg><span class="copy-label">Copy link</span></button>
   </div>
   <p class="small muted">This browser also keeps it under My tickets.</p>
+</section>
 
-  <h2 style="margin-top:1.5rem">What happens next</h2>
-  <ol class="steps" style="margin-top:.6rem">
+<section class="section">
+  <h2>What happens next</h2>
+  <ol class="steps">
     <li>A technician picks up your ticket.</li>
     <li>Their replies show up on your ticket page{% if email_enabled and ticket.requester_email %} and in your email{% endif %}.</li>
     <li>When it's fixed, your ticket page shows how it was resolved.</li>
   </ol>
-  <div class="form-actions" style="margin-top:1.25rem">
-    <a class="btn" href="{% url 'portal:ticket' ticket.token %}">Open my ticket</a>
-    <a class="btn secondary" href="{% url 'portal:home' %}">Back to the help desk</a>
-  </div>
 </section>
+
+<div class="actions-row">
+  <a class="btn" href="{% url 'portal:ticket' ticket.token %}">Open my ticket</a>
+  <a class="btn ghost" href="{% url 'portal:home' %}">New ticket</a>
+</div>
 {% endblock %}

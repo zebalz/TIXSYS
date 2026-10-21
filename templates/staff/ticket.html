@@ -1,61 +1,73 @@
 {% extends "staff/base.html" %}{% load desk %}
 {% block page_title %}#{{ ticket.number }} {{ ticket.summary }}{% endblock %}
 {% block content %}
-<p class="small"><a href="{% url 'staff:tickets' %}">All tickets</a></p>
+<a class="back" href="{% url 'staff:tickets' %}"><svg class="i"><use href="#i-chevron"/></svg>All tickets</a>
 <div class="ticket-layout">
   <div>
-    <div class="t-title">
-      <span class="num">#{{ ticket.number }}</span>
-      <span class="status k-{{ ticket.status.kind }}">{{ ticket.status.name }}</span>
-      <span class="prio p-{{ ticket.priority }}">{{ ticket.get_priority_display }} priority</span>
-    </div>
-    <h1>{{ ticket.summary }}</h1>
-    <div class="t-meta">
-      <span>{{ ticket.board.name }}</span>
-      <span>Opened {{ ticket.created_at|date:"M j, Y, g:i a" }} ({{ ticket.created_at|age }} ago)</span>
-      <span>Via {{ ticket.get_source_display|lower }}{% if ticket.created_by %}, logged by {{ ticket.created_by.display_name }}{% endif %}</span>
+    <div class="thread-head">
+      <div class="top">
+        <span class="num">#{{ ticket.number }}</span>
+        <span class="pill k-{{ ticket.status.kind }}">{{ ticket.status.name }}</span>
+        <span class="prio p-{{ ticket.priority }}">{{ ticket.get_priority_display }} priority</span>
+      </div>
+      <h1>{{ ticket.summary }}</h1>
+      <div class="meta">
+        <span><b>{{ ticket.board.name }}</b></span>
+        <span>Opened {{ ticket.created_at|date:"M j, Y, g:i a" }} ({{ ticket.created_at|age }} ago)</span>
+        <span>Via {{ ticket.get_source_display|lower }}{% if ticket.created_by %}, logged by {{ ticket.created_by.display_name }}{% endif %}</span>
+      </div>
     </div>
 
-    <ol class="timeline">
-      <li class="msg from-them">
-        <header><b>{{ ticket.requester_name }}</b><span class="kind requester">Request</span><time>{{ ticket.created_at|date:"M j, g:i a" }}</time></header>
-        <div class="body">{{ ticket.description }}</div>
+    <ol class="thread">
+      <li class="msg theirs">
+        <div class="who"><span class="avatar peach">{{ ticket.requester_name|name_initials }}</span><b>{{ ticket.requester_name }}</b><span class="tag requester">Request</span><time>{{ ticket.created_at|date:"M j, g:i a" }}</time></div>
+        <div class="bubble"><div class="body">{{ ticket.description }}</div></div>
         {% include "partials/files.html" with files=loose_files %}
       </li>
       {% for kind, when, item in timeline %}
         {% if kind == 'event' %}
-          {% if item.action != 'created' %}<li class="event"><b>{{ item.actor_name }}</b> {{ item.sentence }} <time>{{ item.created_at|date:"M j, g:i a" }}</time></li>{% endif %}
+          {% if item.action != 'created' %}<li class="event"><b>{{ item.actor_name }}</b> {{ item.sentence }}, {{ item.created_at|date:"M j, g:i a" }}</li>{% endif %}
+        {% elif item.from_requester %}
+        <li class="msg theirs"{% if forloop.last %} id="latest"{% endif %}>
+          <div class="who"><span class="avatar peach">{{ item.author_name|name_initials }}</span><b>{{ item.author_name }}</b><span class="tag requester">Employee reply</span><time>{{ item.created_at|date:"M j, g:i a" }}</time></div>
+          <div class="bubble"><div class="body">{{ item.body }}</div></div>
+          {% include "partials/files.html" with files=item.attachments.all %}
+        </li>
         {% else %}
-        <li class="msg {{ item.kind }}{% if item.from_requester %} from-them{% endif %}"{% if forloop.last %} id="latest"{% endif %}>
-          <header>
-            <b>{{ item.author_name }}</b>
-            {% if item.from_requester %}<span class="kind requester">Employee reply</span>{% else %}<span class="kind {{ item.kind }}">{{ item.get_kind_display }}</span>{% endif %}
-            <time>{{ item.created_at|date:"M j, g:i a" }}</time>
-          </header>
-          <div class="body">{{ item.body }}</div>
+        <li class="msg mine {{ item.kind }}"{% if forloop.last %} id="latest"{% endif %}>
+          <div class="who"><b>{{ item.author_name }}</b>{% if item.kind != 'discussion' %}<span class="tag {{ item.kind }}">{{ item.get_kind_display }}</span>{% endif %}<time>{{ item.created_at|date:"M j, g:i a" }}</time></div>
+          <div class="bubble"><div class="body">{{ item.body }}</div></div>
           {% include "partials/files.html" with files=item.attachments.all %}
         </li>
         {% endif %}
       {% endfor %}
     </ol>
 
-    <form method="post" action="{% url 'staff:ticket_note' ticket.number %}" enctype="multipart/form-data" class="box note-form" id="note">
-      <h2>Add a note</h2>
+    <form method="post" action="{% url 'staff:ticket_note' ticket.number %}" enctype="multipart/form-data" class="note-composer" id="note">
       {% csrf_token %}
-      {% if note_form.errors %}{% with form=note_form %}{% include "partials/form_errors.html" %}{% endwith %}{% endif %}
-      <fieldset>
-        <legend>Note type</legend>
-        <div class="radios">
-          {% for radio in note_form.kind %}<label for="{{ radio.id_for_label }}">{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}
+      {% if note_form.non_field_errors %}{% with form=note_form %}{% include "partials/form_errors.html" %}{% endwith %}{% endif %}
+      <div class="kinds">
+        <fieldset class="segmented" aria-label="Note type">
+          {% for radio in note_form.kind %}<label for="{{ radio.id_for_label }}">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}
+        </fieldset>
+        <label class="check" id="waiting-wrap" for="{{ note_form.mark_waiting.id_for_label }}">{{ note_form.mark_waiting }} {{ note_form.mark_waiting.label }}</label>
+      </div>
+      <div class="composer k-discussion{% if note_form.body.errors %} has-error{% endif %}" id="note-box">
+        <label class="visually-hidden" for="{{ note_form.body.id_for_label }}">Note</label>
+        {{ note_form.body }}
+        <div class="composer-bar">
+          <label class="icon-btn" for="{{ note_form.files.id_for_label }}" title="Attach files"><svg class="i"><use href="#i-plus"/></svg><span class="visually-hidden">Attach files</span></label>
+          {{ note_form.files }}
+          <ul class="file-list" data-file-list="{{ note_form.files.id_for_label }}"></ul>
+          <span class="grow"></span>
+          <button class="send-btn" type="submit" title="Add note"><svg class="i"><use href="#i-send"/></svg><span class="visually-hidden">Add note</span></button>
         </div>
-      </fieldset>
-      {% include "partials/field.html" with field=note_form.body %}
-      <div id="waiting-wrap">{% include "partials/field.html" with field=note_form.mark_waiting %}</div>
-      {% include "partials/field.html" with field=note_form.files %}
-      <button class="btn" type="submit">Add note</button>
+      </div>
+      {{ note_form.body.errors }}{{ note_form.files.errors }}
+      <p class="below" id="kind-hint" data-discussion="The employee sees this note." data-internal="Staff only. The employee never sees this." data-resolution="The employee sees this, and the ticket is marked resolved.">Discussion and resolution notes are shown to the employee. Internal notes are staff only.</p>
     </form>
 
-    <details class="history box" style="margin-top:1rem">
+    <details class="history">
       <summary>Full history ({{ history|length }} changes)</summary>
       <ol>
         {% for e in history %}<li><b>{{ e.actor_name }}</b> {{ e.sentence }}<time>{{ e.created_at|date:"M j, Y, g:i:s a" }}</time></li>{% endfor %}
@@ -64,7 +76,7 @@
   </div>
 
   <div class="side-panel">
-    <form method="post" action="{% url 'staff:ticket_update' ticket.number %}" class="box">
+    <form method="post" action="{% url 'staff:ticket_update' ticket.number %}" class="panel">
       <h2>Details</h2>
       {% csrf_token %}
       {% with form=update_form %}{% include "partials/form_errors.html" %}{% endwith %}
@@ -74,16 +86,16 @@
       {% include "partials/field.html" with field=update_form.assignee %}
       {% include "partials/field.html" with field=update_form.board %}
       {% include "partials/field.html" with field=update_form.category %}
-      <div class="row-actions"><button class="btn small" type="submit">Save changes</button></div>
+      <button class="btn small block" type="submit">Save changes</button>
     </form>
     {% if ticket.assignee_id != user.id and not ticket.assignee_id or ticket.assignee_id != user.id and user.is_supervisor %}
     <form method="post" action="{% url 'staff:ticket_take' ticket.number %}">
       {% csrf_token %}
-      <button class="btn secondary" type="submit" style="width:100%">Assign to me</button>
+      <button class="btn ghost block" type="submit">Assign to me</button>
     </form>
     {% endif %}
 
-    <section class="box">
+    <section class="panel">
       <h2>Requester</h2>
       <dl>
         <dt>Name</dt><dd>{{ ticket.requester_name }}</dd>
@@ -91,10 +103,10 @@
         {% if ticket.requester_phone %}<dt>Phone</dt><dd><a href="tel:{{ ticket.requester_phone }}">{{ ticket.requester_phone }}</a></dd>{% endif %}
         {% if ticket.location %}<dt>Location</dt><dd>{{ ticket.location }}</dd>{% endif %}
       </dl>
-      <p class="small muted" style="margin:1rem 0 .3rem">Their private link (send it if they called in):</p>
+      <p class="small muted" style="margin:1rem 0 .2rem">Their private link, to send if they called in:</p>
       <div class="linkbox">
         <input id="private-link" type="text" value="{{ private_link }}" readonly aria-label="Requester's private link">
-        <button class="btn secondary small" type="button" data-copy="private-link">Copy</button>
+        <button class="icon-btn" type="button" data-copy="private-link" title="Copy link"><svg class="i"><use href="#i-copy"/></svg><span class="visually-hidden">Copy link</span></button>
       </div>
     </section>
   </div>

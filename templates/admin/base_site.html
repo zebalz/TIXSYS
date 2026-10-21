@@ -1,16 +1,26 @@
-{% extends "admin/base.html" %}
+{% extends "admin/base.html" %}{% load static %}
 {% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title }}{% endblock %}
 {% block extrastyle %}{{ block.super }}<style>
+@font-face { font-family: "Hanken Grotesk"; font-weight: 400; font-display: swap; src: url("{% static 'fonts/hanken-grotesk-latin-400-normal.woff2' %}") format("woff2"); }
+@font-face { font-family: "Hanken Grotesk"; font-weight: 600; font-display: swap; src: url("{% static 'fonts/hanken-grotesk-latin-600-normal.woff2' %}") format("woff2"); }
 :root, html[data-theme="light"] {
-  --primary: #2a5585; --secondary: #17222e; --accent: #f59e0b;
-  --header-bg: #17222e; --header-color: #e7edf3; --header-branding-color: #ffffff; --header-link-color: #ffffff;
-  --breadcrumbs-bg: #2a5585; --link-fg: #2a5585; --link-hover-color: #17222e; --link-selected-fg: #17222e;
-  --button-bg: #2a5585; --button-hover-bg: #17222e; --default-button-bg: #17222e; --default-button-hover-bg: #2a5585;
+  --font-family-primary: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+  --primary: #eeebff; --secondary: #f7f6fa; --accent: #5a48c6; --primary-fg: #26232f;
+  --header-bg: #f7f6fa; --header-color: #5e5a6b; --header-branding-color: #26232f; --header-link-color: #26232f;
+  --breadcrumbs-bg: #ffffff; --breadcrumbs-fg: #8d8a99; --breadcrumbs-link-fg: #5a48c6;
+  --link-fg: #5a48c6; --link-hover-color: #26232f; --link-selected-fg: #26232f;
+  --button-bg: #26232f; --button-hover-bg: #4a4657; --default-button-bg: #26232f; --default-button-hover-bg: #4a4657;
+  --selected-row: #f7f6fa; --hairline-color: #ebe9f1; --border-color: #dcd9e5;
 }
-#site-name a, #site-name a:link, #site-name a:visited { font-weight: 700; color: #ffffff; }
+#header { border-bottom: 1px solid #ebe9f1; }
+#site-name a, #site-name a:link, #site-name a:visited { font-weight: 600; color: #26232f; }
+.module h2, .module caption, .inline-group h2 { color: #26232f; border-radius: 10px 10px 0 0; }
+.button, input[type=submit], input[type=button], .submit-row input, a.button { border-radius: 999px; }
+div.breadcrumbs { border-bottom: 1px solid #ebe9f1; }
+.back-link { color: #26232f; margin-left: 1rem; text-decoration: none; font-weight: 600; }
 </style>{% endblock %}
 {% block branding %}
 <div id="site-name"><a href="{% url 'admin:index' %}">{{ site_header }}</a></div>
 {% if user.is_anonymous %}{% include "admin/color_theme_toggle.html" %}{% endif %}
 {% endblock %}
-{% block nav-global %}<a href="/staff/" style="color:#fff;margin-left:1rem">Back to tickets</a>{% endblock %}
+{% block nav-global %}<a class="back-link" href="/staff/">Back to tickets</a>{% endblock %}

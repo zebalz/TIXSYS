@@ -108,4 +108,4 @@ python manage.py migrate && python manage.py createcachetable && python manage.p
 python manage.py runserver
 ```
 
-Fonts (Atkinson Hyperlegible and Barlow Semi Condensed) are served from this server under the SIL Open Font License; the license files are in `static/fonts/`.
+The font (Hanken Grotesk) is served from this server under the SIL Open Font License; the license file is in `static/fonts/`.

@@ -1,119 +1,104 @@
 {% extends "staff/base.html" %}{% load desk %}
 {% block page_title %}Tickets{% endblock %}
 {% block content %}
-<div class="work-head">
+<div class="page-head">
   <h1>Tickets</h1>
   <form class="search" method="get" role="search">
     <input type="hidden" name="view" value="{{ view }}">
+    <svg class="i"><use href="#i-search"/></svg>
     <label class="visually-hidden" for="q">Search tickets</label>
-    <input type="search" id="q" name="q" value="{{ f.q }}" placeholder="Number, name, words…">
-    <button class="btn secondary small" type="submit">Search</button>
+    <input type="search" id="q" name="q" value="{{ f.q }}" placeholder="Search number, name or words">
   </form>
-  <a class="btn" href="{% url 'staff:log_call' %}">Log a call</a>
+  <a class="btn" href="{% url 'staff:log_call' %}"><svg class="i"><use href="#i-plus"/></svg>Log a call</a>
 </div>
 
-<nav class="tabs" aria-label="Quick views">
+<nav class="segmented" aria-label="Quick views">
   {% for key, label, count in views %}
   <a href="?view={{ key }}"{% if key == view %} aria-current="page"{% endif %}>{{ label }}{% if count is not None %} <span class="count">{{ count }}</span>{% endif %}</a>
   {% endfor %}
 </nav>
 
-<form class="filters" method="get">
+<form class="filters" method="get" data-autosubmit>
   <input type="hidden" name="view" value="{{ view }}">
   {% if f.q %}<input type="hidden" name="q" value="{{ f.q }}">{% endif %}
-  <div>
-    <label for="f-board">Board</label>
-    <select id="f-board" name="board">
-      <option value="">All boards</option>
-      {% for b in boards %}<option value="{{ b.id }}"{% if f.board == b.id|stringformat:'s' %} selected{% endif %}>{{ b.name }}</option>{% endfor %}
-    </select>
-  </div>
-  <div>
-    <label for="f-status">Status</label>
-    <select id="f-status" name="status">
-      <option value="">All statuses</option>
-      {% for s in statuses %}<option value="{{ s.id }}"{% if f.status == s.id|stringformat:'s' %} selected{% endif %}>{{ s.name }}</option>{% endfor %}
-    </select>
-  </div>
-  <div>
-    <label for="f-priority">Priority</label>
-    <select id="f-priority" name="priority">
-      <option value="">All priorities</option>
-      {% for key, label in priorities %}<option value="{{ key }}"{% if f.priority == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
-  </div>
-  <div>
-    <label for="f-assignee">Assignee</label>
-    <select id="f-assignee" name="assignee">
-      <option value="">Anyone</option>
-      <option value="none"{% if f.assignee == 'none' %} selected{% endif %}>Unassigned</option>
-      {% for s in staff %}<option value="{{ s.id }}"{% if f.assignee == s.id|stringformat:'s' %} selected{% endif %}>{{ s.display_name }}</option>{% endfor %}
-    </select>
-  </div>
-  <div>
-    <label for="f-sort">Sort</label>
-    <select id="f-sort" name="sort">
-      {% for key, label in sorts %}<option value="{{ key }}"{% if sort == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
-  </div>
-  <button class="btn secondary small" type="submit">Apply</button>
-  {% if filters_active %}<a class="btn quiet small" href="?view={{ view }}">Clear filters</a>{% endif %}
+  <select name="board" aria-label="Board">
+    <option value="">All boards</option>
+    {% for b in boards %}<option value="{{ b.id }}"{% if f.board == b.id|stringformat:'s' %} selected{% endif %}>{{ b.name }}</option>{% endfor %}
+  </select>
+  <select name="status" aria-label="Status">
+    <option value="">All statuses</option>
+    {% for s in statuses %}<option value="{{ s.id }}"{% if f.status == s.id|stringformat:'s' %} selected{% endif %}>{{ s.name }}</option>{% endfor %}
+  </select>
+  <select name="priority" aria-label="Priority">
+    <option value="">All priorities</option>
+    {% for key, label in priorities %}<option value="{{ key }}"{% if f.priority == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="assignee" aria-label="Assignee">
+    <option value="">Anyone</option>
+    <option value="none"{% if f.assignee == 'none' %} selected{% endif %}>Unassigned</option>
+    {% for s in staff %}<option value="{{ s.id }}"{% if f.assignee == s.id|stringformat:'s' %} selected{% endif %}>{{ s.display_name }}</option>{% endfor %}
+  </select>
+  <select name="sort" aria-label="Sort">
+    {% for key, label in sorts %}<option value="{{ key }}"{% if sort == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button class="btn soft small" type="submit" data-apply>Apply</button>
+  {% if filters_active %}<a class="btn ghost small" href="?view={{ view }}">Clear filters</a>{% endif %}
 </form>
 
-<div class="table-wrap">
 {% if page.object_list %}
+<div class="table-wrap">
 <table class="tickets">
   <thead>
     <tr>
       <th scope="col">#</th>
       <th scope="col">Summary</th>
-      <th scope="col">Board</th>
       <th scope="col">Status</th>
       <th scope="col">Priority</th>
       <th scope="col">Assignee</th>
+      <th scope="col">Board</th>
       <th scope="col">Age</th>
     </tr>
   </thead>
   <tbody>
   {% for t in page.object_list %}
-    <tr{% if t.status.kind == 'new' %} class="is-new"{% endif %}>
+    <tr>
       <td class="num"><a href="{% url 'staff:ticket' t.number %}">{{ t.number }}</a></td>
       <td class="sum">
         <a href="{% url 'staff:ticket' t.number %}">{{ t.summary }}</a>
-        <span class="who">{{ t.requester_name }}{% if t.location %}, {{ t.location }}{% endif %}{% if t.category %} — {{ t.category }}{% endif %}</span>
+        <span class="who">{{ t.requester_name }}{% if t.location %}, {{ t.location }}{% endif %}</span>
       </td>
-      <td>{{ t.board.name }}</td>
-      <td><span class="status k-{{ t.status.kind }}">{{ t.status.name }}</span></td>
+      <td><span class="pill k-{{ t.status.kind }}">{{ t.status.name }}</span></td>
       <td><span class="prio p-{{ t.priority }}">{{ t.get_priority_display }}</span></td>
-      <td>{% if t.assignee %}{{ t.assignee.display_name }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if t.assignee %}<span class="person"><span class="avatar">{{ t.assignee|initials }}</span>{{ t.assignee.display_name }}</span>{% else %}<span class="muted">Unassigned</span>{% endif %}</td>
+      <td class="muted">{{ t.board.name }}</td>
       <td class="age" title="Opened {{ t.created_at|date:'M j, Y g:i a' }}">{{ t.created_at|age }}</td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
 <div class="empty">
   {% if filters_active %}
   <p>No tickets match these filters.</p>
-  <a class="btn secondary small" href="?view={{ view }}">Clear filters</a>
+  <a class="btn ghost small" href="?view={{ view }}">Clear filters</a>
   {% elif view == 'mine' %}
   <p>Nothing is assigned to you right now.</p>
-  <a class="btn secondary small" href="?view=unassigned">See unassigned tickets</a>
+  <a class="btn ghost small" href="?view=unassigned">See unassigned tickets</a>
   {% elif view == 'unassigned' %}
   <p>Every open ticket has someone on it.</p>
   {% else %}
   <p>No tickets here.</p>
-  <a class="btn secondary small" href="{% url 'staff:log_call' %}">Log a call</a>
+  <a class="btn ghost small" href="{% url 'staff:log_call' %}">Log a call</a>
   {% endif %}
 </div>
 {% endif %}
-</div>
 
 {% if page.paginator.num_pages > 1 %}
 <nav class="pager" aria-label="Pages">
-  {% if page.has_previous %}<a class="btn secondary small" href="?{{ query_without_page }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
+  {% if page.has_previous %}<a class="btn ghost small" href="?{{ query_without_page }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
   <span class="muted small">Page {{ page.number }} of {{ page.paginator.num_pages }} ({{ page.paginator.count }} tickets)</span>
-  {% if page.has_next %}<a class="btn secondary small" href="?{{ query_without_page }}&page={{ page.next_page_number }}">Next</a>{% endif %}
+  {% if page.has_next %}<a class="btn ghost small" href="?{{ query_without_page }}&page={{ page.next_page_number }}">Next</a>{% endif %}
 </nav>
 {% endif %}
 {% endblock %}

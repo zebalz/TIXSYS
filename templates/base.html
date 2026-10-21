@@ -7,11 +7,13 @@
 <title>{% block title %}{{ org.portal_title }}{% endblock %} — {{ org.name }}</title>
 <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
 <link rel="stylesheet" href="{% static 'css/tixsys.css' %}">
-<style>:root{--brand:{{ org.brand_color|default:'#2A5585' }};--brand-ink:{{ org.brand_color|default:'#2A5585'|readable_on }};--header:{{ org.header_color|default:'#17222E' }};--header-ink:{{ org.header_color|default:'#17222E'|readable_on }};}</style>
+<style>:root{--brand:{{ org.brand_color|default:'#26232F' }};--brand-ink:{{ org.brand_color|default:'#26232F'|readable_on }};--accent:{{ org.header_color|default:'#CFC6FF' }};}</style>
+<script src="{% static 'js/boot.js' %}"></script>
 {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <a class="skip" href="#main">Skip to content</a>
+{% include "partials/icons.html" %}
 {% block body %}{% endblock %}
 </body>
 </html>
