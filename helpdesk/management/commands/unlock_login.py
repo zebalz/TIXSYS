@@ -1,6 +1,6 @@
 """Unlocks a staff account that was locked by too many failed sign-ins.
 
-    python manage.py unlock_login <username>
+python manage.py unlock_login <username>
 """
 
 from django.core.management.base import BaseCommand

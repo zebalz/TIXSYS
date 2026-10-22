@@ -25,9 +25,11 @@ class SpamCheckMixin(forms.Form):
     """A field people never see (bots fill it) plus a signed time stamp
     (bots submit faster than any person can type)."""
 
-    leave_blank = forms.CharField(required=False, label="Leave this empty", widget=forms.TextInput(
-        attrs={"autocomplete": "off", "tabindex": "-1"}
-    ))
+    leave_blank = forms.CharField(
+        required=False,
+        label="Leave this empty",
+        widget=forms.TextInput(attrs={"autocomplete": "off", "tabindex": "-1"}),
+    )
     stamp = forms.CharField(required=False, widget=forms.HiddenInput)
 
     def looks_like_spam(self):
@@ -182,9 +184,9 @@ class TicketUpdateForm(forms.ModelForm):
         self.fields["board"].queryset = Board.objects.filter(organization=org).filter(
             is_active=True
         ) | Board.objects.filter(pk=self.instance.board_id)
-        self.fields["status"].queryset = Status.objects.filter(organization=org, is_active=True) | Status.objects.filter(
-            pk=self.instance.status_id
-        )
+        self.fields["status"].queryset = Status.objects.filter(
+            organization=org, is_active=True
+        ) | Status.objects.filter(pk=self.instance.status_id)
         self.fields["category"].queryset = Category.objects.filter(organization=org, is_active=True)
         self.fields["category"].empty_label = "None"
         self.fields["assignee"].queryset = staff_queryset(org)
@@ -221,4 +223,6 @@ class ProfileForm(forms.ModelForm):
 
 
 class PasswordConfirmForm(forms.Form):
-    password = forms.CharField(label="Your password", widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}))
+    password = forms.CharField(
+        label="Your password", widget=forms.PasswordInput(attrs={"autocomplete": "current-password"})
+    )

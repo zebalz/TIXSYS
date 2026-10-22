@@ -4,6 +4,8 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
@@ -255,6 +257,8 @@ class Ticket(models.Model):
     updated_at = models.DateTimeField(default=timezone.now)
     resolved_at = models.DateTimeField(null=True, blank=True)
     is_demo = models.BooleanField(default=False, editable=False)
+    # Full-text index of the summary, description, requester details and all notes.
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         ordering = ["-created_at"]
@@ -264,10 +268,22 @@ class Ticket(models.Model):
             models.Index(fields=["organization", "assignee"]),
             models.Index(fields=["organization", "board"]),
             models.Index(fields=["requester_email"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["resolved_at"]),
+            GinIndex(fields=["search_vector"], name="ticket_search_idx"),
         ]
 
     def __str__(self):
         return f"#{self.number} {self.summary}"
+
+    def save(self, *args, **kwargs):
+        # The search index is written only by search.refresh(). An ordinary save leaves it
+        # alone, because the copy held in memory may be out of date.
+        if not self._state.adding and kwargs.get("update_fields") is None and not kwargs.get("force_insert"):
+            kwargs["update_fields"] = [
+                f.name for f in self._meta.concrete_fields if not f.primary_key and f.name != "search_vector"
+            ]
+        super().save(*args, **kwargs)
 
     @property
     def is_open(self):
@@ -405,3 +421,65 @@ class Resource(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class SavedSearch(models.Model):
+    """A ticket-list search a staff member saved, shown in their sidebar."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_searches")
+    name = models.CharField(max_length=60)
+    query_string = models.CharField(max_length=1000)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["name"]
+        unique_together = [("user", "name")]
+
+    def __str__(self):
+        return self.name
+
+
+class SecurityEvent(models.Model):
+    """Sign-ins, lockouts and other security-relevant actions, for review and audits."""
+
+    LOGIN_OK = "login_ok"
+    LOGIN_FAILED = "login_failed"
+    LOGIN_BLOCKED = "login_blocked"
+    CODE_FAILED = "code_failed"
+    LOGOUT = "logout"
+    PASSWORD_CHANGED = "password_changed"  # a log entry name; not a password  # nosec B105
+    AUTHENTICATOR_ON = "authenticator_on"
+    AUTHENTICATOR_OFF = "authenticator_off"
+    AUTHENTICATOR_RESET = "authenticator_reset"
+    LINK_RESET = "link_reset"
+    EXPORT = "export"
+    KIND_CHOICES = [
+        (LOGIN_OK, "Signed in"),
+        (LOGIN_FAILED, "Wrong password"),
+        (LOGIN_BLOCKED, "Sign-in blocked (too many failures)"),
+        (CODE_FAILED, "Wrong authenticator code"),
+        (LOGOUT, "Signed out"),
+        (PASSWORD_CHANGED, "Changed password"),
+        (AUTHENTICATOR_ON, "Turned on authenticator app"),
+        (AUTHENTICATOR_OFF, "Turned off authenticator app"),
+        (AUTHENTICATOR_RESET, "Administrator turned off someone's authenticator app"),
+        (LINK_RESET, "Reset a ticket's private link"),
+        (EXPORT, "Exported tickets"),
+    ]
+
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    username = models.CharField(max_length=150, blank=True)
+    kind = models.CharField(max_length=24, choices=KIND_CHOICES)
+    ip = models.CharField("IP address", max_length=64, blank=True)
+    user_agent = models.CharField("Browser", max_length=200, blank=True)
+    detail = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "security log entry"
+        verbose_name_plural = "security log entries"
+
+    def __str__(self):
+        return f"{self.get_kind_display()}: {self.username}"

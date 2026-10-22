@@ -12,9 +12,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from .. import services
+from .. import safe, search, security_log, services
+from ..export import ticket_as_text, tickets_as_text
 from ..forms import LogCallForm, NoteForm, TicketUpdateForm, staff_queryset
-from ..models import Attachment, Board, Status, Ticket
+from ..models import Attachment, Board, SavedSearch, SecurityEvent, Status, Ticket
 from .portal import file_response
 
 VIEWS = [
@@ -26,6 +27,7 @@ VIEWS = [
     ("all", "Everything"),
 ]
 SORTS = [
+    ("best", "Best match"),
     ("newest", "Newest first"),
     ("oldest", "Oldest first"),
     ("updated", "Recently updated"),
@@ -50,12 +52,13 @@ def _ticket_or_404(request, number):
     )
 
 
-@staff_required
-@require_GET
-def ticket_list(request):
+def _filtered_tickets(request):
+    """The ticket list as the current view, filters, search and sort select it."""
     org = request.org
     user = request.user
-    view = request.GET.get("view", "open")
+    q_text = safe.text(request.GET.get("q"), 500)
+    # A search looks through every ticket unless a view was picked.
+    view = request.GET.get("view") or ("all" if q_text else "open")
     if view not in dict(VIEWS) or (view == "myboard" and not user.specialty_id):
         view = "open"
     qs = Ticket.objects.filter(organization=org).select_related("status", "board", "assignee", "category")
@@ -71,32 +74,25 @@ def ticket_list(request):
     elif view == "done":
         qs = qs.filter(done)
 
-    f = {k: request.GET.get(k, "").strip() for k in ("board", "status", "priority", "assignee", "q")}
-    if f["board"].isdigit():
-        qs = qs.filter(board_id=int(f["board"]))
-    if f["status"].isdigit():
-        qs = qs.filter(status_id=int(f["status"]))
+    f = {k: safe.text(request.GET.get(k), 100) for k in ("board", "status", "priority", "assignee")}
+    f["q"] = q_text
+    if safe.number(f["board"]) is not None:
+        qs = qs.filter(board_id=safe.number(f["board"]))
+    if safe.number(f["status"]) is not None:
+        qs = qs.filter(status_id=safe.number(f["status"]))
     if f["priority"] in dict(Ticket.PRIORITY_CHOICES):
         qs = qs.filter(priority=f["priority"])
     if f["assignee"] == "none":
         qs = qs.filter(assignee__isnull=True)
-    elif f["assignee"].isdigit():
-        qs = qs.filter(assignee_id=int(f["assignee"]))
-    if f["q"]:
-        q = f["q"].lstrip("#")
-        match = (
-            Q(summary__icontains=q)
-            | Q(description__icontains=q)
-            | Q(requester_name__icontains=q)
-            | Q(requester_email__icontains=q)
-            | Q(location__icontains=q)
-        )
-        if q.isdigit():
-            match |= Q(number=int(q))
-        qs = qs.filter(match)
+    elif safe.number(f["assignee"]) is not None:
+        qs = qs.filter(assignee_id=safe.number(f["assignee"]))
+    parsed = search.parse(f["q"], user=user)
+    qs = search.apply(qs, parsed)
 
-    sort = request.GET.get("sort", "newest")
-    if sort == "oldest":
+    sort = request.GET.get("sort") or ("best" if parsed.has_text else "newest")
+    if sort == "best" and parsed.has_text:
+        qs = qs.order_by("-rank", "-created_at")
+    elif sort == "oldest":
         qs = qs.order_by("created_at")
     elif sort == "updated":
         qs = qs.order_by("-updated_at")
@@ -105,6 +101,16 @@ def ticket_list(request):
     else:
         sort = "newest"
         qs = qs.order_by("-created_at")
+    return qs, view, sort, f, parsed
+
+
+@staff_required
+@require_GET
+def ticket_list(request):
+    org = request.org
+    user = request.user
+    qs, view, sort, f, parsed = _filtered_tickets(request)
+    done = Q(status__kind__in=Status.DONE_KINDS)
 
     page = Paginator(qs, 50).get_page(request.GET.get("page"))
     keep = {k: v for k, v in f.items() if v}
@@ -138,9 +144,34 @@ def ticket_list(request):
             "priorities": Ticket.PRIORITY_CHOICES,
             "staff": staff_queryset(org),
             "query_without_page": urlencode(keep),
+            "q_param": urlencode({"q": f["q"]}) if f["q"] else "",
             "latest_id": latest_id,
+            "parsed": parsed,
+            "field_help": search.FIELD_HELP,
+            "current_query": urlencode(keep),
         },
     )
+
+
+@staff_required
+@require_POST
+def save_search(request):
+    name = safe.text(request.POST.get("name"), 60)
+    query_string = safe.query_string(request.POST.get("query_string"))
+    if not name or not query_string:
+        messages.error(request, "Give the search a name to save it.")
+        return redirect(reverse("staff:tickets") + ("?" + query_string if query_string else ""))
+    SavedSearch.objects.update_or_create(user=request.user, name=name, defaults={"query_string": query_string})
+    messages.success(request, f"Saved search \u201c{name}\u201d. It's in your sidebar.")
+    return redirect(reverse("staff:tickets") + "?" + query_string)
+
+
+@staff_required
+@require_POST
+def delete_search(request, search_id):
+    SavedSearch.objects.filter(user=request.user, pk=search_id).delete()
+    messages.info(request, "Saved search removed.")
+    return redirect("staff:tickets")
 
 
 def _timeline(ticket):
@@ -166,6 +197,7 @@ def _ticket_page(request, ticket, update_form=None, note_form=None, status=200):
             "update_form": update_form or TicketUpdateForm(instance=ticket),
             "note_form": note_form or NoteForm(),
             "private_link": request.build_absolute_uri(reverse("portal:ticket", args=[ticket.token])),
+            "copy_text": ticket_as_text(ticket),
         },
         status=status,
     )
@@ -224,6 +256,16 @@ def ticket_note(request, number):
 
 
 @staff_required
+@require_POST
+def reset_link(request, number):
+    ticket = _ticket_or_404(request, number)
+    services.reset_private_link(ticket, request.user)
+    security_log.record(request, SecurityEvent.LINK_RESET, user=request.user, detail=f"ticket #{ticket.number}")
+    messages.success(request, "New private link made. The old link no longer works. Send the new one to the employee.")
+    return redirect("staff:ticket", number=number)
+
+
+@staff_required
 def attachment(request, attachment_id):
     att = get_object_or_404(Attachment.objects.select_related("ticket"), pk=attachment_id)
     if att.ticket.organization_id != request.org.id:
@@ -263,10 +305,7 @@ def log_call(request):
 def poll(request):
     """Polled by the workspace every few seconds for new-ticket alerts."""
     org = request.org
-    try:
-        after = int(request.GET.get("after", "0"))
-    except ValueError:
-        after = 0
+    after = safe.number(request.GET.get("after")) or 0
     new = list(
         Ticket.objects.filter(organization=org, id__gt=after)
         .exclude(created_by=request.user)
@@ -295,22 +334,6 @@ def poll(request):
 # --- Reports -----------------------------------------------------------------
 
 
-def _duration_words(td):
-    if td is None:
-        return "—"
-    minutes = int(td.total_seconds() // 60)
-    days, minutes = divmod(minutes, 60 * 24)
-    hours, minutes = divmod(minutes, 60)
-    parts = []
-    if days:
-        parts.append(f"{days} day{'s' if days != 1 else ''}")
-    if hours:
-        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
-    if not days and minutes:
-        parts.append(f"{minutes} min")
-    return " ".join(parts) or "under a minute"
-
-
 def _bars(rows, label_key, count_key="n"):
     top = max([r[count_key] for r in rows] or [0]) or 1
     return [
@@ -322,19 +345,21 @@ def _bars(rows, label_key, count_key="n"):
 @staff_required
 @require_GET
 def reports(request):
-    from datetime import timedelta
+    from django.db.models import Count
 
-    from django.db.models import Avg, Count, F
-    from django.db.models.functions import TruncWeek
-    from django.utils import timezone
+    from .. import reports as report_data
 
     if not request.user.is_supervisor:
         raise PermissionDenied
     org = request.org
+    weeks = report_data.pick_weeks(request.GET.get("weeks"))
+    data = report_data.build(org, weeks)
+
     tickets = Ticket.objects.filter(organization=org)
     open_qs = tickets.exclude(status__kind__in=Status.DONE_KINDS)
-
-    by_board = _bars(list(open_qs.values("board__name").annotate(n=Count("id")).order_by("-n", "board__name")), "board__name")
+    by_board = _bars(
+        list(open_qs.values("board__name").annotate(n=Count("id")).order_by("-n", "board__name")), "board__name"
+    )
     by_status = _bars(
         list(open_qs.values("status__name", "status__order").annotate(n=Count("id")).order_by("status__order")),
         "status__name",
@@ -342,118 +367,55 @@ def reports(request):
     assignee_rows = list(
         open_qs.values("assignee__first_name", "assignee__last_name", "assignee__username")
         .annotate(n=Count("id"))
-        .order_by("-n")
+        .order_by("-n", "assignee__first_name")
     )
     for r in assignee_rows:
         full = f"{r['assignee__first_name'] or ''} {r['assignee__last_name'] or ''}".strip()
         r["who"] = full or r["assignee__username"]
     by_assignee = _bars(assignee_rows, "who")
-
-    # Opened vs. resolved, last 8 weeks (weeks start Monday).
-    weeks = 8
-    now = timezone.localtime()
-    this_monday = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-    start = this_monday - timedelta(weeks=weeks - 1)
-    opened = {
-        r["w"].date(): r["n"]
-        for r in tickets.filter(created_at__gte=start).annotate(w=TruncWeek("created_at")).values("w").annotate(n=Count("id"))
-    }
-    resolved = {
-        r["w"].date(): r["n"]
-        for r in tickets.filter(resolved_at__gte=start)
-        .annotate(w=TruncWeek("resolved_at"))
-        .values("w")
-        .annotate(n=Count("id"))
-    }
-    week_rows = []
-    for i in range(weeks):
-        monday = (start + timedelta(weeks=i)).date()
-        week_rows.append({"week": monday, "opened": opened.get(monday, 0), "resolved": resolved.get(monday, 0)})
-    chart = _week_chart(week_rows)
-
-    done = tickets.filter(resolved_at__isnull=False)
-    avg_30 = done.filter(resolved_at__gte=now - timedelta(days=30)).aggregate(a=Avg(F("resolved_at") - F("created_at")))["a"]
-    avg_all = done.aggregate(a=Avg(F("resolved_at") - F("created_at")))["a"]
-    resolved_30 = done.filter(resolved_at__gte=now - timedelta(days=30)).count()
-
-    oldest = open_qs.select_related("status", "board", "assignee").order_by("created_at")[:10]
+    by_category = _bars(
+        list(
+            tickets.filter(created_at__gte=data["start"])
+            .values("category__name")
+            .annotate(n=Count("id"))
+            .order_by("-n", "category__name")[:6]
+        ),
+        "category__name",
+    )
+    for r in by_category:
+        if r["label"] == "Unassigned":
+            r["label"] = "No category"
+    oldest = open_qs.select_related("status", "board", "assignee").order_by("created_at")[:8]
 
     return render(
         request,
         "staff/reports.html",
         {
             "nav": "reports",
-            "open_total": open_qs.count(),
+            "r": data,
+            "ranges": report_data.RANGES,
             "by_board": by_board,
             "by_status": by_status,
             "by_assignee": by_assignee,
-            "week_rows": week_rows,
-            "chart": chart,
-            "avg_30": _duration_words(avg_30),
-            "avg_all": _duration_words(avg_all),
-            "resolved_30": resolved_30,
+            "by_category": by_category,
             "oldest": oldest,
         },
     )
 
 
-def _week_chart(rows):
-    """Geometry for a paired bar chart drawn as SVG in the template."""
-    width, height = 720, 240
-    left, right, top, bottom = 36, 8, 16, 34
-    plot_w, plot_h = width - left - right, height - top - bottom
-    peak = max([max(r["opened"], r["resolved"]) for r in rows] or [0])
-    step = 1
-    for candidate in (1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000):
-        step = candidate
-        if peak / candidate <= 5:
-            break
-    y_max = max(step, ((peak + step - 1) // step) * step)
-    group_w = plot_w / max(len(rows), 1)
-    bar_w = min(22, (group_w - 14) / 2)
-    gap = 2
-    groups = []
-    for i, r in enumerate(rows):
-        gx = left + i * group_w
-        center = gx + group_w / 2
-        bars = []
-        for j, key in enumerate(("opened", "resolved")):
-            value = r[key]
-            h = plot_h * value / y_max if y_max else 0
-            x = center - bar_w - gap / 2 if j == 0 else center + gap / 2
-            base = top + plot_h
-            y = base - h
-            rad = min(4, bar_w / 2, h)
-            # Rounded at the data end only; square where it meets the baseline.
-            d = (
-                f"M{x:.1f},{base:.1f} V{y + rad:.1f} Q{x:.1f},{y:.1f} {x + rad:.1f},{y:.1f} "
-                f"H{x + bar_w - rad:.1f} Q{x + bar_w:.1f},{y:.1f} {x + bar_w:.1f},{y + rad:.1f} V{base:.1f} Z"
-            )
-            bars.append({"key": key, "value": value, "d": d if h > 0 else "", "label_x": round(x + bar_w / 2, 1), "label_y": round(y - 5, 1)})
-        groups.append(
-            {
-                "x": round(gx, 1),
-                "w": round(group_w, 1),
-                "center": round(center, 1),
-                "label": r["week"].strftime("%b %-d"),
-                "week": r["week"],
-                "opened": r["opened"],
-                "resolved": r["resolved"],
-                "bars": bars,
-            }
-        )
-    ticks = []
-    value = 0
-    while value <= y_max:
-        ticks.append({"value": value, "y": round(top + plot_h - plot_h * value / y_max, 1)})
-        value += step
-    return {
-        "width": width,
-        "height": height,
-        "left": left,
-        "right": width - right,
-        "base": top + plot_h,
-        "label_y": height - 12,
-        "groups": groups,
-        "ticks": ticks,
-    }
+@staff_required
+@require_GET
+def export_text(request):
+    """The tickets in the current list view as one plain-text file, one block per ticket."""
+    from django.http import HttpResponse
+    from django.utils import timezone
+
+    qs, _view, _sort, f, _parsed = _filtered_tickets(request)
+    body = tickets_as_text(qs.prefetch_related("notes"))
+    security_log.record(
+        request, SecurityEvent.EXPORT, user=request.user, detail=f"{qs.count()} tickets; search: {f['q'][:150]}"
+    )
+    stamp = timezone.localtime().strftime("%Y-%m-%d")
+    response = HttpResponse(body, content_type="text/plain; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="tickets-{stamp}.txt"'
+    return response

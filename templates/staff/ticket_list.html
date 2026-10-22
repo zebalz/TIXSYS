@@ -1,52 +1,76 @@
 {% extends "staff/base.html" %}{% load desk %}
 {% block page_title %}Tickets{% endblock %}
 {% block content %}
-<div class="page-head">
-  <h1>Tickets</h1>
-  <form class="search" method="get" role="search">
-    <input type="hidden" name="view" value="{{ view }}">
-    <svg class="i"><use href="#i-search"/></svg>
-    <label class="visually-hidden" for="q">Search tickets</label>
-    <input type="search" id="q" name="q" value="{{ f.q }}" placeholder="Search number, name or words">
-  </form>
-  <a class="btn" href="{% url 'staff:log_call' %}"><svg class="i"><use href="#i-plus"/></svg>Log a call</a>
+<div class="sticky-head glass">
+  <div class="page-head">
+    <h1>Tickets</h1>
+    <form class="search" method="get" role="search" action="{% url 'staff:tickets' %}">
+      <svg class="i"><use href="#i-search"/></svg>
+      <label class="visually-hidden" for="q">Search tickets</label>
+      <input type="search" id="q" name="q" value="{{ f.q }}" placeholder="Search all tickets: words, &quot;phrases&quot;, status:resolved…" autocomplete="off">
+      <details class="search-help">
+        <summary>How to search</summary>
+        <div class="help-card glass">
+          <h3>Search tips</h3>
+          <table>
+            <tr><td>printer jam</td><td>Tickets with both words. Word forms count: <code>print</code> finds printing.</td></tr>
+            <tr><td>"blue screen"</td><td>The exact phrase.</td></tr>
+            <tr><td>vpn OR wifi</td><td>Either word (OR in capitals).</td></tr>
+            <tr><td>outlook -calendar</td><td>Leave out tickets with a word. Works on fields too: <code>-status:closed</code></td></tr>
+            <tr><td>#1042</td><td>A ticket number.</td></tr>
+            {% for name, example in field_help %}<tr><td>{{ name }}</td><td>{{ example }}</td></tr>{% endfor %}
+          </table>
+          <p class="small muted mt-s mb-0">Searches look through every ticket and all notes. Mix anything: <code>printer status:resolved opened:&lt;30d</code></p>
+        </div>
+      </details>
+    </form>
+  </div>
+
+  <div class="head-row">
+    <nav class="segmented" aria-label="Quick views" data-liquid="clear">
+      {% for key, label, count in views %}
+      <a href="?view={{ key }}{% if q_param %}&{{ q_param }}{% endif %}"{% if key == view %} aria-current="page"{% endif %}>{{ label }}{% if count is not None %} <span class="count">{{ count }}</span>{% endif %}</a>
+      {% endfor %}
+    </nav>
+    <form class="filters" method="get" data-autosubmit>
+      <input type="hidden" name="view" value="{{ view }}">
+      {% if f.q %}<input type="hidden" name="q" value="{{ f.q }}">{% endif %}
+      <select name="board" aria-label="Board">
+        <option value="">All boards</option>
+        {% for b in boards %}<option value="{{ b.id }}"{% if f.board == b.id|stringformat:'s' %} selected{% endif %}>{{ b.name }}</option>{% endfor %}
+      </select>
+      <select name="status" aria-label="Status">
+        <option value="">All statuses</option>
+        {% for s in statuses %}<option value="{{ s.id }}"{% if f.status == s.id|stringformat:'s' %} selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      </select>
+      <select name="priority" aria-label="Priority">
+        <option value="">All priorities</option>
+        {% for key, label in priorities %}<option value="{{ key }}"{% if f.priority == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <select name="assignee" aria-label="Assignee">
+        <option value="">Anyone</option>
+        <option value="none"{% if f.assignee == 'none' %} selected{% endif %}>Unassigned</option>
+        {% for s in staff %}<option value="{{ s.id }}"{% if f.assignee == s.id|stringformat:'s' %} selected{% endif %}>{{ s.display_name }}</option>{% endfor %}
+      </select>
+      <select name="sort" aria-label="Sort">
+        {% for key, label in sorts %}{% if key != 'best' or parsed.has_text %}<option value="{{ key }}"{% if sort == key %} selected{% endif %}>{{ label }}</option>{% endif %}{% endfor %}
+      </select>
+      <button class="btn soft small" type="submit" data-apply>Apply</button>
+      {% if filters_active %}<a class="btn ghost small" href="?view={{ view }}">Clear</a>{% endif %}
+    </form>
+  </div>
+
+  {% if f.q %}
+  <div class="query-line" aria-live="polite">
+    <span>{{ page.paginator.count }} ticket{{ page.paginator.count|pluralize }} matching</span>
+    {% for chip in parsed.chips %}<span class="chip">{{ chip }}</span>{% endfor %}
+    {% for problem in parsed.problems %}<span class="problem">{{ problem }}</span>{% endfor %}
+  </div>
+  {% endif %}
 </div>
 
-<nav class="segmented" aria-label="Quick views">
-  {% for key, label, count in views %}
-  <a href="?view={{ key }}"{% if key == view %} aria-current="page"{% endif %}>{{ label }}{% if count is not None %} <span class="count">{{ count }}</span>{% endif %}</a>
-  {% endfor %}
-</nav>
-
-<form class="filters" method="get" data-autosubmit>
-  <input type="hidden" name="view" value="{{ view }}">
-  {% if f.q %}<input type="hidden" name="q" value="{{ f.q }}">{% endif %}
-  <select name="board" aria-label="Board">
-    <option value="">All boards</option>
-    {% for b in boards %}<option value="{{ b.id }}"{% if f.board == b.id|stringformat:'s' %} selected{% endif %}>{{ b.name }}</option>{% endfor %}
-  </select>
-  <select name="status" aria-label="Status">
-    <option value="">All statuses</option>
-    {% for s in statuses %}<option value="{{ s.id }}"{% if f.status == s.id|stringformat:'s' %} selected{% endif %}>{{ s.name }}</option>{% endfor %}
-  </select>
-  <select name="priority" aria-label="Priority">
-    <option value="">All priorities</option>
-    {% for key, label in priorities %}<option value="{{ key }}"{% if f.priority == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select>
-  <select name="assignee" aria-label="Assignee">
-    <option value="">Anyone</option>
-    <option value="none"{% if f.assignee == 'none' %} selected{% endif %}>Unassigned</option>
-    {% for s in staff %}<option value="{{ s.id }}"{% if f.assignee == s.id|stringformat:'s' %} selected{% endif %}>{{ s.display_name }}</option>{% endfor %}
-  </select>
-  <select name="sort" aria-label="Sort">
-    {% for key, label in sorts %}<option value="{{ key }}"{% if sort == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select>
-  <button class="btn soft small" type="submit" data-apply>Apply</button>
-  {% if filters_active %}<a class="btn ghost small" href="?view={{ view }}">Clear filters</a>{% endif %}
-</form>
-
+<div class="table-pane pane">
 {% if page.object_list %}
-<div class="table-wrap">
 <table class="tickets">
   <thead>
     <tr>
@@ -76,10 +100,12 @@
   {% endfor %}
   </tbody>
 </table>
-</div>
 {% else %}
 <div class="empty">
-  {% if filters_active %}
+  {% if f.q %}
+  <p>No tickets match that search.</p>
+  <a class="btn ghost small" href="?view={{ view }}">Clear the search</a>
+  {% elif filters_active %}
   <p>No tickets match these filters.</p>
   <a class="btn ghost small" href="?view={{ view }}">Clear filters</a>
   {% elif view == 'mine' %}
@@ -89,10 +115,10 @@
   <p>Every open ticket has someone on it.</p>
   {% else %}
   <p>No tickets here.</p>
-  <a class="btn ghost small" href="{% url 'staff:log_call' %}">Log a call</a>
   {% endif %}
 </div>
 {% endif %}
+</div>
 
 {% if page.paginator.num_pages > 1 %}
 <nav class="pager" aria-label="Pages">
@@ -101,4 +127,20 @@
   {% if page.has_next %}<a class="btn ghost small" href="?{{ query_without_page }}&page={{ page.next_page_number }}">Next</a>{% endif %}
 </nav>
 {% endif %}
+
+<div class="dock-wrap">
+  <div class="dock glass" data-liquid>
+    <a class="btn" href="{% url 'staff:log_call' %}"><svg class="i"><use href="#i-plus"/></svg>Log a call</a>
+    <a class="btn ghost" href="{% url 'staff:export_text' %}?{{ current_query }}" title="Download the tickets in this list as a text file"><svg class="i"><use href="#i-download"/></svg>Export as text</a>
+    {% if filters_active %}
+    <form method="post" action="{% url 'staff:save_search' %}">
+      {% csrf_token %}
+      <input type="hidden" name="query_string" value="{{ current_query }}">
+      <label class="visually-hidden" for="save-name">Name for this search</label>
+      <input type="text" id="save-name" name="name" maxlength="60" placeholder="Name this search" required>
+      <button class="btn ghost" type="submit"><svg class="i"><use href="#i-bookmark"/></svg>Save</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

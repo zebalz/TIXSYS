@@ -3,7 +3,7 @@
 {% block body_class %}staff{% endblock %}
 {% block body %}
 <div class="shell" id="app" data-poll-url="{% url 'staff:poll' %}">
-  <aside class="side" id="side" aria-label="Workspace menu">
+  <aside class="side glass" id="side" aria-label="Workspace menu">
     <a class="side-brand" href="{% url 'staff:tickets' %}">
       {% if org.logo %}<img src="{% url 'portal:logo' %}" alt="">{% else %}<span class="mark" aria-hidden="true"></span>{% endif %}
       <span class="names"><b>{{ org.name }}</b><span>Help desk workspace</span></span>
@@ -15,6 +15,20 @@
       {% if user.is_admin_role %}<a class="side-link" href="/staff/settings/"><svg class="i"><use href="#i-sliders"/></svg>Settings</a>{% endif %}
       <a class="side-link" href="{% url 'staff:account' %}"{% if nav == 'account' %} aria-current="page"{% endif %}><svg class="i"><use href="#i-user"/></svg>My account</a>
     </nav>
+
+    {% with searches=saved_searches %}
+    {% if searches %}
+    <div class="side-heading">Saved searches</div>
+    <ul class="side-list">
+      {% for s in searches %}
+      <li>
+        <a href="{% url 'staff:tickets' %}?{{ s.query_string }}" title="{{ s.name }}"><svg class="i"><use href="#i-bookmark"/></svg><span class="t">{{ s.name }}</span></a>
+        <form method="post" action="{% url 'staff:delete_search' s.id %}">{% csrf_token %}<button class="icon-btn" type="submit" title="Remove saved search"><svg class="i"><use href="#i-x"/></svg><span class="visually-hidden">Remove {{ s.name }}</span></button></form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
 
     <div class="side-foot">
       <div class="switch-row">
@@ -30,7 +44,7 @@
   </aside>
 
   <div class="main">
-    <div class="topbar">
+    <div class="topbar glass">
       <button class="icon-btn" type="button" data-menu aria-controls="side" aria-expanded="false"><svg class="i"><use href="#i-menu"/></svg><span class="visually-hidden">Menu</span></button>
       <b>{{ org.name }}</b>
       <a class="btn small" href="{% url 'staff:log_call' %}">Log a call</a>
@@ -47,4 +61,5 @@
 </div>
 <script src="{% static 'js/common.js' %}" defer></script>
 <script src="{% static 'js/staff.js' %}" defer></script>
+{% block scripts %}{% endblock %}
 {% endblock %}

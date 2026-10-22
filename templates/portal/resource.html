@@ -2,10 +2,10 @@
 {% block title %}{{ resource.title }}{% endblock %}
 {% block content %}
 <a class="back" href="{% url 'portal:resources' %}"><svg class="i"><use href="#i-chevron"/></svg>How-to articles</a>
-<article class="article">
-  <h1 style="margin-bottom:1rem">{{ resource.title }}</h1>
+<article class="article pane">
+  <h1>{{ resource.title }}</h1>
   {% if resource.body %}<div class="body">{{ resource.body|urlize }}</div>{% endif %}
-  {% if resource.link %}<p style="margin-top:1.25rem"><a class="btn ghost" href="{{ resource.link }}" target="_blank" rel="noopener noreferrer">Open the linked page</a></p>{% endif %}
-  <p class="muted small" style="margin-top:2rem">Didn't help? <a href="{% url 'portal:home' %}">Send a ticket</a>.</p>
+  {% if resource.link %}<p class="mt-m"><a class="btn ghost" href="{{ resource.link }}" target="_blank" rel="noopener noreferrer">Open the linked page</a></p>{% endif %}
+  <p class="muted small mt-l mb-0">Didn't help? <a href="{% url 'portal:home' %}">Send a ticket</a>.</p>
 </article>
 {% endblock %}

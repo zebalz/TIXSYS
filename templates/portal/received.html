@@ -7,17 +7,17 @@
   <p>We've got it, {{ ticket.requester_name.split.0 }}.{% if email_enabled and ticket.requester_email %} We also emailed the link below to {{ ticket.requester_email }}.{% endif %}</p>
 </div>
 
-<section class="section">
+<section class="card">
   <h2>Keep this link</h2>
   <p class="muted">It opens your ticket so you can check on it and reply. Anyone with the link can see the ticket, so keep it to yourself.</p>
   <div class="linkbox">
     <input id="private-link" type="text" value="{{ link }}" readonly aria-label="Private link to your ticket">
     <button class="btn small" type="button" data-copy="private-link"><svg class="i"><use href="#i-copy"/></svg><span class="copy-label">Copy link</span></button>
   </div>
-  <p class="small muted">This browser also keeps it under My tickets.</p>
+  <p class="small muted mb-0">This browser also keeps it under My tickets.</p>
 </section>
 
-<section class="section">
+<section class="card">
   <h2>What happens next</h2>
   <ol class="steps">
     <li>A technician picks up your ticket.</li>
@@ -27,7 +27,7 @@
 </section>
 
 <div class="actions-row">
-  <a class="btn" href="{% url 'portal:ticket' ticket.token %}">Open my ticket</a>
+  <a class="btn" href="{% url 'portal:ticket' ticket.token %}" data-liquid>Open my ticket</a>
   <a class="btn ghost" href="{% url 'portal:home' %}">New ticket</a>
 </div>
 {% endblock %}

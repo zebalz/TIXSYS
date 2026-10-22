@@ -2,7 +2,7 @@
 {% block body_class %}portal{% endblock %}
 {% block body %}
 <div class="shell">
-  <aside class="side" id="side" aria-label="Help desk menu">
+  <aside class="side glass" id="side" aria-label="Help desk menu">
     <a class="side-brand" href="{% url 'portal:home' %}">
       {% if org.logo %}<img src="{% url 'portal:logo' %}" alt="">{% else %}<span class="mark" aria-hidden="true"></span>{% endif %}
       <span class="names"><b>{{ org.name }}</b><span>{{ org.portal_title }}</span></span>
@@ -17,7 +17,7 @@
     {% with tickets=sidebar_tickets %}
     {% if tickets %}
     <div class="side-heading">Recent tickets</div>
-    <ul class="side-tickets">
+    <ul class="side-list">
       {% for t in tickets|slice:":10" %}
       <li><a href="{% url 'portal:ticket' t.token %}"{% if current_ticket and current_ticket.pk == t.pk %} aria-current="page"{% endif %} title="{{ t.summary }} ({{ t.status.name }})">
         <span class="dot k-{{ t.status.kind }}" aria-hidden="true"></span><span class="t">{{ t.summary }}</span><span class="n">#{{ t.number }}</span>
@@ -34,12 +34,11 @@
   </aside>
 
   <div class="main">
-    <div class="topbar">
+    <div class="topbar glass">
       <button class="icon-btn" type="button" data-menu aria-controls="side" aria-expanded="false"><svg class="i"><use href="#i-menu"/></svg><span class="visually-hidden">Menu</span></button>
       <b>{{ org.name }}</b>
       <a class="btn small" href="{% url 'portal:home' %}">New ticket</a>
     </div>
-    {% block glow %}{% endblock %}
     <main id="main" class="content">
       {% include "partials/messages.html" %}
       {% block content %}{% endblock %}

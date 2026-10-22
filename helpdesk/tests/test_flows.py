@@ -70,6 +70,11 @@ class Base(TestCase):
         self.tech2 = self.make_user("tech2", User.TECHNICIAN)
         self.boss = self.make_user("boss", User.SUPERVISOR)
         self.admin = self.make_user("admin", User.ADMIN)
+        # Administrators must use an authenticator app (REQUIRE_AUTHENTICATOR_FOR=admin).
+        self.admin_secret = pyotp.random_base32()
+        self.admin.totp_secret = self.admin_secret
+        self.admin.totp_enabled = True
+        self.admin.save()
 
     def make_user(self, username, role):
         user = User.objects.create_user(username=username, password="Correct-Horse-9", role=role, organization=self.org)
@@ -93,7 +98,7 @@ class Base(TestCase):
         return self.client.post(reverse("portal:submit"), data)
 
     def new_ticket(self, **kwargs):
-        defaults = dict(requester_name="Ana Lopez", requester_email="ana@example.org", description="Help")
+        defaults = {"requester_name": "Ana Lopez", "requester_email": "ana@example.org", "description": "Help"}
         defaults.update(kwargs)
         return services.create_ticket(self.org, **defaults)
 
@@ -151,7 +156,9 @@ class PortalTests(Base):
         self.assertEqual(Ticket.objects.count(), 0)
 
     def test_fake_image_is_rejected(self):
-        response = self.submit(files=SimpleUploadedFile("evil.png", b"<script>alert(1)</script>", content_type="image/png"))
+        response = self.submit(
+            files=SimpleUploadedFile("evil.png", b"<script>alert(1)</script>", content_type="image/png")
+        )
         self.assertContains(response, "isn&#x27;t an image or PDF")
         self.assertEqual(Ticket.objects.count(), 0)
 
@@ -210,7 +217,9 @@ class PortalTests(Base):
     def test_closed_ticket_refuses_replies(self):
         ticket = self.new_ticket()
         services.update_ticket(ticket, self.tech, {"status": self.org.status_of_kind(Status.CLOSED)})
-        response = self.client.post(reverse("portal:ticket", args=[ticket.token]), {"body": "Hello?", "stamp": old_stamp()})
+        response = self.client.post(
+            reverse("portal:ticket", args=[ticket.token]), {"body": "Hello?", "stamp": old_stamp()}
+        )
         self.assertEqual(ticket.notes.count(), 0)
         self.assertContains(response, "This ticket is closed")
 
@@ -319,6 +328,9 @@ class SignInTests(Base):
         response = self.client.post(
             "/staff/login/", {"username": "admin", "password": "Correct-Horse-9", "next": "/staff/settings/"}
         )
+        self.assertRedirects(response, reverse("staff:login_code"))
+        code = pyotp.TOTP(self.admin_secret).now()
+        response = self.client.post(reverse("staff:login_code"), {"code": code})
         self.assertRedirects(response, "/staff/settings/")
 
 
@@ -371,7 +383,9 @@ class WorkspaceTests(Base):
         ticket = self.new_ticket(assignee=self.tech)
         self.login(self.tech)
         self.client.post(reverse("staff:ticket_note", args=[ticket.number]), {"kind": "internal", "body": "checking"})
-        self.client.post(reverse("staff:ticket_note", args=[ticket.number]), {"kind": "resolution", "body": "Replaced it"})
+        self.client.post(
+            reverse("staff:ticket_note", args=[ticket.number]), {"kind": "resolution", "body": "Replaced it"}
+        )
         ticket.refresh_from_db()
         self.assertEqual(ticket.status.kind, Status.RESOLVED)
         self.assertEqual(list(ticket.notes.values_list("kind", flat=True)), ["internal", "resolution"])
@@ -411,18 +425,66 @@ class WorkspaceTests(Base):
         self.assertEqual(data["latest_id"], second.id)
 
     def test_reports_for_supervisors_only(self):
-        call_command("seed_demo", tickets=30, stdout=io.StringIO())
+        call_command("seed_demo", weeks=8, per_week=6, stdout=io.StringIO())
         self.login(self.tech)
         self.assertEqual(self.client.get(reverse("staff:reports")).status_code, 403)
         self.login(self.boss)
-        response = self.client.get(reverse("staff:reports"))
-        self.assertContains(response, "Opened and resolved per week")
-        self.assertContains(response, "Oldest open tickets")
+        for weeks in ("4", "12", "26", "nonsense"):
+            response = self.client.get(reverse("staff:reports"), {"weeks": weeks})
+            self.assertContains(response, "Opened vs. resolved")
+            self.assertContains(response, "Oldest open tickets")
+            self.assertContains(response, 'id="report-data"')
+        # Every number in the charts is also in a table.
+        self.assertContains(response, "Show as a table", count=6)
+
+    def test_report_numbers(self):
+        from helpdesk import reports
+
+        a = self.new_ticket(description="One", source=Ticket.PORTAL)
+        b = self.new_ticket(description="Two", source=Ticket.PHONE)
+        services.add_note(a, self.tech, Note.RESOLUTION, "Fixed it")
+        data = reports.build(self.org, 4)
+        self.assertEqual(data["kpis"]["total"], 2)
+        self.assertEqual(data["kpis"]["portal_share"], 50)
+        self.assertEqual(data["kpis"]["resolved"], 1)
+        self.assertEqual(data["kpis"]["open_now"], 1)
+        self.assertEqual(sum(w["opened"] for w in data["week_list"]), 2)
+        self.assertEqual(sum(sum(row) for row in data["punch"]), 2)
+        self.assertEqual(sum(s["n"] for s in data["strands"]), 2)
+        self.assertEqual({(s["s"], s["o"]) for s in data["strands"]}, {("portal", "fixed"), ("phone", "open")})
+        self.assertEqual(len(data["day_list"]), 28)
+        self.assertEqual(reports.pick_weeks("26"), 26)
+        self.assertEqual(reports.pick_weeks("9999"), reports.DEFAULT_WEEKS)
+        self.assertEqual(reports.hours_words(0.5), "30 min")
+        self.assertEqual(reports.hours_words(26), "1 day 2 hr")
+        self.assertEqual(reports.hours_short(0.75), "45 min")
+        self.assertEqual(reports.hours_short(1.5), "1 hr 30 min")
+        self.assertEqual(reports.hours_short(3.9), "4 hr")
+        self.assertEqual(reports.hours_short(60), "2.5 days")
+        b.refresh_from_db()
 
     def test_clear_demo_keeps_real_data(self):
         real = self.new_ticket(description="Real ticket")
-        call_command("seed_demo", tickets=20, stdout=io.StringIO())
+        call_command("seed_demo", weeks=4, per_week=5, stdout=io.StringIO())
         self.assertTrue(Ticket.objects.filter(is_demo=True).exists())
         call_command("clear_demo", yes=True, stdout=io.StringIO())
         self.assertEqual(list(Ticket.objects.values_list("pk", flat=True)), [real.pk])
         self.assertFalse(User.objects.filter(username__startswith="demo.").exists())
+
+
+class ExportTests(Base):
+    def test_copy_text_and_export_file(self):
+        ticket = self.new_ticket(description="Printer jammed\nTray 2", location="Room 9")
+        services.add_note(ticket, self.tech, Note.INTERNAL, "Ordered a roller")
+        self.login(self.tech)
+        page = self.client.get(reverse("staff:ticket", args=[ticket.number]))
+        self.assertContains(page, "Ticket #1001: Printer jammed")
+        self.assertContains(page, "Location: Room 9")
+        response = self.client.get(reverse("staff:export_text"), {"view": "open"})
+        self.assertEqual(response["Content-Type"], "text/plain; charset=utf-8")
+        self.assertIn("attachment", response["Content-Disposition"])
+        body = response.content.decode()
+        self.assertIn("Ticket #1001: Printer jammed", body)
+        self.assertIn("Ordered a roller", body)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("staff:export_text")).status_code, 302)

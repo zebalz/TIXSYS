@@ -10,7 +10,8 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Attachment, Note, Organization, Status, Ticket, TicketEvent, User
+from . import search
+from .models import Attachment, Note, Organization, Status, Ticket, TicketEvent, User, new_ticket_token
 
 log = logging.getLogger(__name__)
 
@@ -90,7 +91,9 @@ def create_ticket(
     number = (last or FIRST_TICKET_NUMBER - 1) + 1
 
     if board is None:
-        board = (category.board if category and category.board and category.board.is_active else None) or org.default_board()
+        board = (
+            category.board if category and category.board and category.board.is_active else None
+        ) or org.default_board()
     status = org.status_of_kind(Status.ASSIGNED if assignee else Status.NEW) or org.status_of_kind(Status.NEW)
     when = created_at or timezone.now()
 
@@ -116,7 +119,10 @@ def create_ticket(
     )
     via = dict(Ticket.SOURCE_CHOICES).get(source, source).lower()
     if created_by:
-        event = record(ticket, TicketEvent.CREATED, actor=created_by, detail=f"logged a {via} from {ticket.requester_name}")
+        article = "an" if via[:1] in "aeiou" else "a"
+        event = record(
+            ticket, TicketEvent.CREATED, actor=created_by, detail=f"logged {article} {via} from {ticket.requester_name}"
+        )
     else:
         event = record(ticket, TicketEvent.CREATED, actor_name=ticket.requester_name, detail="submitted on the portal")
     if created_at:
@@ -128,6 +134,7 @@ def create_ticket(
 
     for f in files:
         save_attachment(ticket, f, from_requester=created_by is None, uploaded_by=created_by)
+    search.refresh([ticket.pk])
 
     if not is_demo:
         transaction.on_commit(lambda: notify_new_ticket(ticket))
@@ -151,7 +158,9 @@ def save_attachment(ticket, uploaded, *, note=None, from_requester=False, upload
     att.file.save(uploaded.name, uploaded, save=False)
     att.save()
     who = ticket.requester_name if from_requester else None
-    record(ticket, TicketEvent.ATTACHMENT, actor=uploaded_by, actor_name=who, detail=f"added a file: {att.original_name}")
+    record(
+        ticket, TicketEvent.ATTACHMENT, actor=uploaded_by, actor_name=who, detail=f"added a file: {att.original_name}"
+    )
     return att
 
 
@@ -180,11 +189,11 @@ def update_ticket(ticket, user, changes):
     labels_before = {name: field_label(ticket, name) for name in TRACKED_FIELDS}
 
     new_assignee = changes.get("assignee", before["assignee"])
-    if new_assignee != before["assignee"] and before["assignee"] is not None and before["assignee"] != user:
-        if not user.is_supervisor:
-            raise NotAllowed(
-                f"This ticket belongs to {before['assignee'].display_name}. Only a supervisor can reassign it."
-            )
+    reassigning = new_assignee != before["assignee"] and before["assignee"] is not None and before["assignee"] != user
+    if reassigning and not user.is_supervisor:
+        raise NotAllowed(
+            f"This ticket belongs to {before['assignee'].display_name}. Only a supervisor can reassign it."
+        )
 
     for name in ("summary", "board", "priority", "category", "assignee"):
         if name in changes:
@@ -206,10 +215,19 @@ def update_ticket(ticket, user, changes):
     for name in TRACKED_FIELDS:
         if getattr(ticket, name) != before[name]:
             changed.append(name)
-            record(ticket, TicketEvent.CHANGED, actor=user, field=name, old=labels_before[name], new=field_label(ticket, name))
+            record(
+                ticket,
+                TicketEvent.CHANGED,
+                actor=user,
+                field=name,
+                old=labels_before[name],
+                new=field_label(ticket, name),
+            )
     if changed:
         ticket.updated_at = timezone.now()
         ticket.save()
+        if "summary" in changed:
+            search.refresh([ticket.pk])
     return changed
 
 
@@ -231,6 +249,7 @@ def add_note(ticket, user, kind, body, files=(), mark_waiting=False):
         record(ticket, TicketEvent.CHANGED, actor=user, field="status", old=old, new=target.name)
     ticket.updated_at = timezone.now()
     ticket.save()
+    search.refresh([ticket.pk])
 
     if note.visible_to_requester:
         transaction.on_commit(lambda: notify_requester_of_note(ticket, note))
@@ -268,8 +287,18 @@ def add_requester_reply(ticket, body, files=()):
             )
     ticket.updated_at = timezone.now()
     ticket.save()
+    search.refresh([ticket.pk])
     transaction.on_commit(lambda: notify_staff_of_reply(ticket, note))
     return note
+
+
+@transaction.atomic
+def reset_private_link(ticket, user):
+    """Gives the ticket a new private link. The old link stops working."""
+    ticket.token = new_ticket_token()
+    ticket.save(update_fields=["token"])
+    record(ticket, TicketEvent.CHANGED, actor=user, field="private link", old="old link", new="new link")
+    return ticket.token
 
 
 # --- Email -------------------------------------------------------------------

@@ -3,7 +3,7 @@
 {% block body_class %}staff{% endblock %}
 {% block body %}
 <main class="login-page" id="main">
-  <div class="login">
+  <div class="login glass">
     <h1>Sign in</h1>
     <p class="sub">{{ org.name }} help desk workspace</p>
     <form method="post">
@@ -13,7 +13,7 @@
       <input type="hidden" name="next" value="{{ next }}">
       {% include "partials/field.html" with field=form.username %}
       {% include "partials/field.html" with field=form.password %}
-      <button class="btn block" type="submit">Sign in</button>
+      <button class="btn block" type="submit" data-liquid>Sign in</button>
     </form>
     <p class="foot">Forgot your password? Ask the administrator to reset it.<br><a href="{% url 'portal:home' %}">Go to the employee portal</a></p>
   </div>

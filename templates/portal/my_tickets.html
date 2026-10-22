@@ -3,11 +3,11 @@
 {% block content %}
 <div class="thread-head">
   <h1>My tickets</h1>
-  <p class="muted" style="margin:.4rem 0 0">Tickets sent or opened in this browser.</p>
+  <p class="intro">Tickets sent or opened in this browser.</p>
 </div>
 
 {% if tickets %}
-<ul class="list">
+<ul class="list pane">
   {% for t in tickets %}
   <li><a href="{% url 'portal:ticket' t.token %}">
     <span class="n">#{{ t.number }}</span>
@@ -25,10 +25,10 @@
 {% endif %}
 
 {% if email_enabled %}
-<section class="card" style="margin-top:2rem">
-  <h2 style="margin-bottom:.4rem">Email me links to all my tickets</h2>
+<section class="card mt-l">
+  <h2>Email me links to all my tickets</h2>
   {% if sent %}
-  <p style="margin:0">If there are tickets for that address, the links are on their way. Check your email.</p>
+  <p class="mb-0">If there are tickets for that address, the links are on their way. Check your email.</p>
   {% else %}
   <p class="muted">We'll send links to every ticket sent with your email address.</p>
   <form method="post">

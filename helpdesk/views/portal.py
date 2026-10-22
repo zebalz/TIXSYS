@@ -49,8 +49,7 @@ def sidebar_tickets(request):
     if not tokens:
         return []
     found = {
-        t.token: t
-        for t in Ticket.objects.filter(organization=request.org, token__in=tokens).select_related("status")
+        t.token: t for t in Ticket.objects.filter(organization=request.org, token__in=tokens).select_related("status")
     }
     return [found[t] for t in tokens if t in found]
 
@@ -74,13 +73,18 @@ def submit(request):
             return render(request, "portal/spam.html", status=200)
         ip = throttle.client_ip(request)
         if throttle.over_limit(f"portal-submit:ip:{ip}", settings.PORTAL_TICKETS_PER_IP_PER_HOUR, 3600):
-            form.add_error(None, "Too many tickets were sent from this network in the last hour. Try again later, or call the help desk.")
+            form.add_error(
+                None,
+                "Too many tickets were sent from this network in the last hour. Try again later, or call the help desk.",
+            )
         elif form.is_valid():
             data = form.cleaned_data
             if throttle.over_limit(
                 f"portal-submit:email:{data['email']}", settings.PORTAL_TICKETS_PER_EMAIL_PER_HOUR, 3600
             ):
-                form.add_error(None, "You've sent a lot of tickets in the last hour. Try again later, or call the help desk.")
+                form.add_error(
+                    None, "You've sent a lot of tickets in the last hour. Try again later, or call the help desk."
+                )
             else:
                 ticket = services.create_ticket(
                     org,
@@ -136,7 +140,7 @@ def ticket(request, token):
     notes = list(
         ticket.notes.filter(kind__in=Note.VISIBLE_TO_REQUESTER).prefetch_related("attachments").select_related("author")
     )
-    loose_files = [a for a in ticket.attachments.filter(note__isnull=True)]
+    loose_files = list(ticket.attachments.filter(note__isnull=True))
     resolution = next((n for n in reversed(notes) if n.kind == Note.RESOLUTION), None)
     response = render(
         request,
@@ -167,10 +171,15 @@ def file_response(att):
     try:
         handle = att.file.open("rb")
     except FileNotFoundError:
-        raise Http404
+        raise Http404 from None
     as_download = not att.is_image
-    response = FileResponse(handle, content_type=att.content_type, as_attachment=as_download, filename=att.original_name)
-    response.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
+    response = FileResponse(
+        handle, content_type=att.content_type, as_attachment=as_download, filename=att.original_name
+    )
+    # Shown on its own, with nothing allowed to run: even a disguised file can't execute anything.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox"
+    )
     response.headers["Cache-Control"] = "private, no-store"
     return response
 
@@ -224,7 +233,29 @@ def logo(request):
     try:
         handle = org.logo.open("rb")
     except FileNotFoundError:
-        raise Http404
+        raise Http404 from None
     response = FileResponse(handle)
     response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
+def brand_css(request):
+    """The organization's colors as CSS variables. A separate file (not inline styles)
+    lets the browser security policy block every inline style."""
+    import re
+
+    from django.http import HttpResponse
+
+    from ..templatetags.desk import readable_on
+
+    def safe(value, fallback):
+        # Only plain #RRGGBB colors reach the stylesheet.
+        return value if re.fullmatch(r"#[0-9A-Fa-f]{6}", value or "") else fallback
+
+    org = request.org
+    brand = safe(org.brand_color, "#26232F")
+    accent = safe(org.header_color, "#CFC6FF")
+    css = f":root{{--brand:{brand};--brand-ink:{readable_on(brand)};--accent:{accent};}}\n"
+    response = HttpResponse(css, content_type="text/css; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=86400"
     return response

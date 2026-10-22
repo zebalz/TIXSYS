@@ -22,7 +22,7 @@
 </section>
 {% endif %}
 
-<ol class="thread">
+<ol class="thread pane">
   <li class="msg mine"{% if not notes %} id="latest"{% endif %}>
     <div class="who"><b>You</b><time datetime="{{ ticket.created_at|date:'c' }}">{{ ticket.created_at|date:"M j, g:i a" }}</time></div>
     <div class="bubble"><div class="body">{{ ticket.description }}</div></div>
@@ -58,7 +58,7 @@
   {% if form.non_field_errors %}{% include "partials/form_errors.html" %}{% endif %}
   <div class="trap" aria-hidden="true"><label for="{{ form.leave_blank.id_for_label }}">Leave this empty</label>{{ form.leave_blank }}</div>
   <input type="hidden" name="stamp" value="{{ stamp }}">
-  <div class="composer{% if form.body.errors %} has-error{% endif %}">
+  <div class="composer glass{% if form.body.errors %} has-error{% endif %}" data-liquid>
     <label class="visually-hidden" for="{{ form.body.id_for_label }}">Your reply</label>
     {{ form.body }}
     <div class="composer-bar">
@@ -66,7 +66,7 @@
       {{ form.files }}
       <ul class="file-list" data-file-list="{{ form.files.id_for_label }}"></ul>
       <span class="grow"></span>
-      <button class="send-btn" type="submit" title="Send reply"><svg class="i"><use href="#i-send"/></svg><span class="visually-hidden">Send reply</span></button>
+      <button class="send-btn" type="submit" title="Send reply" data-liquid><svg class="i"><use href="#i-send"/></svg><span class="visually-hidden">Send reply</span></button>
     </div>
   </div>
   {{ form.body.errors }}{{ form.files.errors }}

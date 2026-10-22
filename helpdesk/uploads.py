@@ -20,6 +20,7 @@ EXTENSIONS = {
     "image/webp": {".webp"},
     "application/pdf": {".pdf"},
 }
+MAX_PIXELS = 40_000_000  # about 8000 x 5000; bigger than any real screenshot
 ACCEPT_ATTR = ".png,.jpg,.jpeg,.gif,.webp,.pdf,image/png,image/jpeg,image/gif,image/webp,application/pdf"
 
 
@@ -46,13 +47,20 @@ def check_file(uploaded):
     if Path(name).suffix.lower() not in EXTENSIONS[content_type]:
         raise forms.ValidationError(f"{name} has the wrong file extension for its contents.")
     if content_type.startswith("image/"):
-        try:
-            from PIL import Image
+        import warnings
 
-            with Image.open(uploaded) as img:
-                img.verify()
-        except Exception:
-            raise forms.ValidationError(f"{name} looks damaged and can't be opened as an image.")
+        from PIL import Image
+
+        try:
+            with warnings.catch_warnings():
+                # A huge image hidden in a small file ("decompression bomb") is refused.
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(uploaded) as img:
+                    if img.width * img.height > MAX_PIXELS:
+                        raise ValueError("too many pixels")
+                    img.verify()
+        except Exception:  # noqa: BLE001 - any failure to read it means it isn't a usable image
+            raise forms.ValidationError(f"{name} looks damaged or too large and can't be used as an image.") from None
         finally:
             uploaded.seek(0)
     return uploaded

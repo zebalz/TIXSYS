@@ -28,5 +28,6 @@ PY
 python manage.py migrate --noinput
 python manage.py createcachetable
 python manage.py bootstrap
+python manage.py rebuild_search --auto
 
 exec "$@"

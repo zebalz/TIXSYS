@@ -3,22 +3,22 @@
 {% block content %}
 <div class="thread-head">
   <h1>Remote help</h1>
-  <p class="muted" style="margin:.4rem 0 0">A technician can see your screen and fix the problem with you. Call or message the help desk first so someone is ready{% if org.help_phone %}: {{ org.help_phone }}{% endif %}.</p>
+  <p class="intro">A technician can see your screen and fix the problem with you. Call or message the help desk first so someone is ready{% if org.help_phone %}: {{ org.help_phone }}{% endif %}.</p>
 </div>
 
 <section class="card">
-  <h2 style="margin-bottom:.4rem">Quick Assist on Windows</h2>
+  <h2>Quick Assist on Windows</h2>
   <p class="muted small">Try the button first. If your browser asks to open Quick Assist, choose Open. If nothing happens, follow the pictures.</p>
-  <div class="actions-row" style="margin:0 0 1.25rem">
-    <a class="btn" href="ms-quick-assist:">Open Quick Assist</a>
+  <div class="actions-row mt-0 mb-m">
+    <a class="btn" href="ms-quick-assist:" data-liquid>Open Quick Assist</a>
   </div>
   {% include "portal/quick_assist_steps.html" %}
-  {% if org.remote_help_text %}<div class="notice" style="margin:1rem 0 0">{{ org.remote_help_text|linebreaksbr }}</div>{% endif %}
+  {% if org.remote_help_text %}<div class="notice mt-m mb-0">{{ org.remote_help_text|linebreaksbr }}</div>{% endif %}
 </section>
 
 <section class="card">
-  <h2 style="margin-bottom:.25rem">Meet on Zoom</h2>
-  <p class="muted small" style="margin:0">Use this if a technician asked you to join their Zoom meeting.</p>
+  <h2>Meet on Zoom</h2>
+  <p class="muted small mb-0">Use this if a technician asked you to join their Zoom meeting.</p>
   {% if techs %}
   <ul class="people">
     {% for t in techs %}
@@ -30,7 +30,7 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p style="margin:.75rem 0 0">No Zoom links are set up yet. Call the help desk instead.</p>
+  <p class="mt-s mb-0">No Zoom links are set up yet. Call the help desk instead.</p>
   {% endif %}
 </section>
 {% endblock %}

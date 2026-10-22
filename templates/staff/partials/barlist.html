@@ -1,0 +1,13 @@
+<section class="chart-card glass span-3 barlist-card" aria-label="{{ title }}">
+  <div class="chart-head"><h2>{{ title }}</h2>{% if sub %}<p>{{ sub }}</p>{% endif %}</div>
+  {% if rows %}
+  <ul class="barlist">
+    {% for row in rows %}
+    <li>
+      <span class="name">{{ row.label }}</span><span class="n">{{ row.n }}</span>
+      <svg width="100%" height="8" aria-hidden="true" focusable="false"><rect class="track" width="100%" height="8" rx="4"></rect><rect class="fill" width="{{ row.pct }}%" height="8" rx="4"></rect><rect class="fill" width="4" height="8"></rect></svg>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">{{ empty }}</p>{% endif %}
+</section>

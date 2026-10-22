@@ -1,6 +1,5 @@
 {% extends "portal/base.html" %}
 {% block title %}{{ org.portal_title }}{% endblock %}
-{% block glow %}<div class="glow" aria-hidden="true"></div>{% endblock %}
 {% block content %}
 <form method="post" action="{% url 'portal:submit' %}" enctype="multipart/form-data" class="ask" id="ticket-form">
   {% csrf_token %}
@@ -12,7 +11,7 @@
   <div class="trap" aria-hidden="true"><label for="{{ form.leave_blank.id_for_label }}">Leave this empty</label>{{ form.leave_blank }}</div>
   <input type="hidden" name="stamp" value="{{ stamp }}">
 
-  <div class="composer{% if form.description.errors %} has-error{% endif %}">
+  <div class="composer glass{% if form.description.errors %} has-error{% endif %}" data-liquid>
     <label class="visually-hidden" for="{{ form.description.id_for_label }}">What's going on?</label>
     {{ form.description }}
     <div class="composer-bar">
@@ -20,7 +19,7 @@
       {{ form.files }}
       <ul class="file-list" data-file-list="{{ form.files.id_for_label }}"></ul>
       <span class="grow"></span>
-      <button class="send-btn" type="submit" title="Send ticket"><svg class="i"><use href="#i-send"/></svg><span class="visually-hidden">Send ticket</span></button>
+      <button class="send-btn" type="submit" title="Send ticket" data-liquid><svg class="i"><use href="#i-send"/></svg><span class="visually-hidden">Send ticket</span></button>
     </div>
   </div>
   {{ form.description.errors }}{{ form.files.errors }}
@@ -31,7 +30,7 @@
   </div>
   {{ form.category.errors }}
 
-  <section class="details" aria-labelledby="details-title">
+  <section class="details pane" aria-labelledby="details-title">
     <div class="details-head"><h2 id="details-title">Your details</h2><span>This computer remembers them for next time.</span></div>
     <div class="grid-2">
       {% include "partials/field.html" with field=form.name %}
@@ -41,8 +40,8 @@
     </div>
   </section>
 
-  <div class="actions-row" style="justify-content:center">
-    <button class="btn" type="submit">Send ticket</button>
+  <div class="actions-row center">
+    <button class="btn" type="submit" data-liquid>Send ticket</button>
   </div>
 </form>
 {% endblock %}

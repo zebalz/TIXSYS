@@ -3,10 +3,10 @@
 {% block content %}
 <div class="thread-head">
   <h1>How-to articles</h1>
-  <p class="muted" style="margin:.4rem 0 0">Short guides for common problems. If one doesn't fix it, <a href="{% url 'portal:home' %}">send a ticket</a>.</p>
+  <p class="intro">Short guides for common problems. If one doesn't fix it, <a href="{% url 'portal:home' %}">send a ticket</a>.</p>
 </div>
 {% if resources %}
-<ul class="list">
+<ul class="list pane">
   {% for r in resources %}
   <li><a href="{% url 'portal:resource' r.id %}"><span class="t">{{ r.title }}</span><svg class="i chev"><use href="#i-chevron"/></svg></a></li>
   {% endfor %}

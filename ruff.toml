@@ -1,0 +1,14 @@
+# Code checks: python -m ruff check .
+line-length = 120
+target-version = "py313"
+extend-exclude = ["helpdesk/migrations"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "BLE", "PLE", "SIM", "RUF", "UP", "ISC", "C4", "EXE", "FLY"]
+ignore = [
+  "E501",    # long lines are allowed where breaking them hurts readability
+  "RUF001",  # en dashes and curly quotes in on-screen text are on purpose
+  "RUF002",
+  "RUF003",
+  "RUF012",  # Django's class settings (list_display, fields...) are lists by convention
+]

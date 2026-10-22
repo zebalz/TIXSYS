@@ -18,7 +18,7 @@
       </div>
     </div>
 
-    <ol class="thread">
+    <ol class="thread pane">
       <li class="msg theirs">
         <div class="who"><span class="avatar peach">{{ ticket.requester_name|name_initials }}</span><b>{{ ticket.requester_name }}</b><span class="tag requester">Request</span><time>{{ ticket.created_at|date:"M j, g:i a" }}</time></div>
         <div class="bubble"><div class="body">{{ ticket.description }}</div></div>
@@ -43,16 +43,16 @@
       {% endfor %}
     </ol>
 
-    <form method="post" action="{% url 'staff:ticket_note' ticket.number %}" enctype="multipart/form-data" class="note-composer" id="note">
+    <form method="post" action="{% url 'staff:ticket_note' ticket.number %}" enctype="multipart/form-data" class="note-composer reply" id="note">
       {% csrf_token %}
       {% if note_form.non_field_errors %}{% with form=note_form %}{% include "partials/form_errors.html" %}{% endwith %}{% endif %}
-      <div class="kinds">
-        <fieldset class="segmented" aria-label="Note type">
-          {% for radio in note_form.kind %}<label for="{{ radio.id_for_label }}">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}
-        </fieldset>
-        <label class="check" id="waiting-wrap" for="{{ note_form.mark_waiting.id_for_label }}">{{ note_form.mark_waiting }} {{ note_form.mark_waiting.label }}</label>
-      </div>
-      <div class="composer k-discussion{% if note_form.body.errors %} has-error{% endif %}" id="note-box">
+      <div class="composer glass k-discussion{% if note_form.body.errors %} has-error{% endif %}" id="note-box" data-liquid>
+        <div class="kinds">
+          <fieldset class="segmented" aria-label="Note type">
+            {% for radio in note_form.kind %}<label for="{{ radio.id_for_label }}">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}
+          </fieldset>
+          <label class="check" id="waiting-wrap" for="{{ note_form.mark_waiting.id_for_label }}">{{ note_form.mark_waiting }} {{ note_form.mark_waiting.label }}</label>
+        </div>
         <label class="visually-hidden" for="{{ note_form.body.id_for_label }}">Note</label>
         {{ note_form.body }}
         <div class="composer-bar">
@@ -67,7 +67,7 @@
       <p class="below" id="kind-hint" data-discussion="The employee sees this note." data-internal="Staff only. The employee never sees this." data-resolution="The employee sees this, and the ticket is marked resolved.">Discussion and resolution notes are shown to the employee. Internal notes are staff only.</p>
     </form>
 
-    <details class="history">
+    <details class="history pane">
       <summary>Full history ({{ history|length }} changes)</summary>
       <ol>
         {% for e in history %}<li><b>{{ e.actor_name }}</b> {{ e.sentence }}<time>{{ e.created_at|date:"M j, Y, g:i:s a" }}</time></li>{% endfor %}
@@ -76,7 +76,7 @@
   </div>
 
   <div class="side-panel">
-    <form method="post" action="{% url 'staff:ticket_update' ticket.number %}" class="panel">
+    <form method="post" action="{% url 'staff:ticket_update' ticket.number %}" class="panel glass">
       <h2>Details</h2>
       {% csrf_token %}
       {% with form=update_form %}{% include "partials/form_errors.html" %}{% endwith %}
@@ -103,11 +103,22 @@
         {% if ticket.requester_phone %}<dt>Phone</dt><dd><a href="tel:{{ ticket.requester_phone }}">{{ ticket.requester_phone }}</a></dd>{% endif %}
         {% if ticket.location %}<dt>Location</dt><dd>{{ ticket.location }}</dd>{% endif %}
       </dl>
-      <p class="small muted" style="margin:1rem 0 .2rem">Their private link, to send if they called in:</p>
+      <p class="panel-note">Their private link, to send if they called in:</p>
       <div class="linkbox">
         <input id="private-link" type="text" value="{{ private_link }}" readonly aria-label="Requester's private link">
         <button class="icon-btn" type="button" data-copy="private-link" title="Copy link"><svg class="i"><use href="#i-copy"/></svg><span class="visually-hidden">Copy link</span></button>
       </div>
+      <form method="post" action="{% url 'staff:reset_link' ticket.number %}" data-confirm="Make a new private link? The old link will stop working.">
+        {% csrf_token %}
+        <button class="btn soft small mt-s" type="submit"><svg class="i"><use href="#i-rotate"/></svg>Make a new link</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Copy as text</h2>
+      <p class="panel-note first">The whole ticket as plain text, to paste into another system.</p>
+      <textarea id="ticket-text" class="visually-hidden" readonly tabindex="-1" aria-hidden="true">{{ copy_text }}</textarea>
+      <button class="btn ghost small block" type="button" data-copy="ticket-text"><svg class="i"><use href="#i-copy"/></svg><span class="copy-label">Copy ticket</span></button>
     </section>
   </div>
 </div>

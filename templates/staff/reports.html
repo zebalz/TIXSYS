@@ -1,80 +1,214 @@
-{% extends "staff/base.html" %}{% load desk %}
+{% extends "staff/base.html" %}{% load static desk %}
 {% block page_title %}Reports{% endblock %}
 {% block content %}
-<div class="page-head"><h1>Reports</h1></div>
-
-<div class="stats">
-  <div class="stat"><b>{{ open_total }}</b><span>Open tickets now</span></div>
-  <div class="stat"><b>{{ resolved_30 }}</b><span>Resolved in the last 30 days</span></div>
-  <div class="stat"><b>{{ avg_30 }}</b><span>Average time to resolve, last 30 days</span></div>
-  <div class="stat"><b>{{ avg_all }}</b><span>Average time to resolve, all time</span></div>
-</div>
-
-<div class="report-grid">
-  <section class="panel">
-    <h2>Open by board</h2>
-    {% if by_board %}<ul class="barlist">{% for r in by_board %}<li><span>{{ r.label }}</span><span class="n">{{ r.n }}</span><span class="bar"><i style="width:{{ r.pct }}%"></i></span></li>{% endfor %}</ul>{% else %}<p class="muted">No open tickets.</p>{% endif %}
-  </section>
-  <section class="panel">
-    <h2>Open by status</h2>
-    {% if by_status %}<ul class="barlist">{% for r in by_status %}<li><span>{{ r.label }}</span><span class="n">{{ r.n }}</span><span class="bar"><i style="width:{{ r.pct }}%"></i></span></li>{% endfor %}</ul>{% else %}<p class="muted">No open tickets.</p>{% endif %}
-  </section>
-  <section class="panel">
-    <h2>Open by assignee</h2>
-    {% if by_assignee %}<ul class="barlist">{% for r in by_assignee %}<li><span>{{ r.label }}</span><span class="n">{{ r.n }}</span><span class="bar"><i style="width:{{ r.pct }}%"></i></span></li>{% endfor %}</ul>{% else %}<p class="muted">No open tickets.</p>{% endif %}
-  </section>
-</div>
-
-<section class="panel chart-box" style="margin-bottom:1.75rem">
-  <h2>Opened and resolved per week</h2>
-  <div class="legend" aria-hidden="true"><span><i class="opened"></i>Opened</span><span><i class="resolved"></i>Resolved</span></div>
-  <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-labelledby="week-chart-title">
-    <title id="week-chart-title">Tickets opened and resolved per week for the last 8 weeks. The same numbers are in the table below.</title>
-    {% for t in chart.ticks %}
-    <line class="gridline" x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ t.y }}" y2="{{ t.y }}"></line>
-    <text class="axis-label" x="{{ chart.left|add:'-6' }}" y="{{ t.y }}" text-anchor="end" dominant-baseline="middle">{{ t.value }}</text>
-    {% endfor %}
-    {% for g in chart.groups %}
-    <g>
-      <rect class="hit" x="{{ g.x }}" y="0" width="{{ g.w }}" height="{{ chart.base }}"><title>Week of {{ g.label }}: {{ g.opened }} opened, {{ g.resolved }} resolved</title></rect>
-      {% for b in g.bars %}
-        {% if b.d %}<path class="{{ b.key }}" d="{{ b.d }}" pointer-events="none"></path>{% endif %}
-        {% if b.value %}<text class="value-label" x="{{ b.label_x }}" y="{{ b.label_y }}" text-anchor="middle" pointer-events="none">{{ b.value }}</text>{% endif %}
-      {% endfor %}
-      <text class="axis-label" x="{{ g.center }}" y="{{ chart.label_y }}" text-anchor="middle">{{ g.label }}</text>
-    </g>
-    {% endfor %}
-    <line x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ chart.base }}" y2="{{ chart.base }}" stroke="#d6d3e0" stroke-width="1"></line>
-  </svg>
-  <details style="margin-top:.75rem">
-    <summary>Show as a table</summary>
-    <table class="plain" style="margin-top:.5rem">
-      <thead><tr><th scope="col">Week of</th><th scope="col" class="n">Opened</th><th scope="col" class="n">Resolved</th></tr></thead>
-      <tbody>{% for r in week_rows %}<tr><td>{{ r.week|date:"M j, Y" }}</td><td class="n">{{ r.opened }}</td><td class="n">{{ r.resolved }}</td></tr>{% endfor %}</tbody>
-    </table>
-  </details>
-</section>
-
-<section class="panel">
-  <h2>Oldest open tickets</h2>
-  {% if oldest %}
-  <div class="table-wrap">
-  <table class="tickets">
-    <thead><tr><th scope="col">#</th><th scope="col">Summary</th><th scope="col">Board</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Age</th></tr></thead>
-    <tbody>
-    {% for t in oldest %}
-      <tr>
-        <td class="num"><a href="{% url 'staff:ticket' t.number %}">{{ t.number }}</a></td>
-        <td class="sum"><a href="{% url 'staff:ticket' t.number %}">{{ t.summary }}</a><span class="who">{{ t.requester_name }}</span></td>
-        <td class="muted">{{ t.board.name }}</td>
-        <td><span class="pill k-{{ t.status.kind }}">{{ t.status.name }}</span></td>
-        <td>{% if t.assignee %}{{ t.assignee.display_name }}{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td class="age">{{ t.created_at|age }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+<div class="report">
+  <div class="page-head report-head">
+    <div>
+      <h1>Reports</h1>
+      <p class="intro">{{ r.start|date:"M j" }} – {{ r.end|date:"M j, Y" }} · {{ r.kpis.total }} ticket{{ r.kpis.total|pluralize }} opened</p>
+    </div>
+    <nav class="segmented" aria-label="Time range" data-liquid="clear">
+      {% for w in ranges %}<a href="?weeks={{ w }}"{% if w == r.weeks %} aria-current="page"{% endif %}>{{ w }} weeks</a>{% endfor %}
+    </nav>
   </div>
-  {% else %}<p class="muted">No open tickets.</p>{% endif %}
-</section>
+
+  <div class="stats">
+    <div class="stat glass">
+      <span class="label">Open now</span>
+      <b>{{ r.kpis.open_now }}</b>
+      <span class="sub">{{ r.kpis.unassigned }} not assigned yet · {{ r.kpis.waiting }} waiting on employees</span>
+    </div>
+    <div class="stat glass">
+      <span class="label">Resolved</span>
+      <b>{{ r.kpis.resolved }}</b>
+      <span class="sub">{% if r.kpis.resolved_change is not None %}<span class="delta">{% if r.kpis.resolved_change >= 0 %}▲ {{ r.kpis.resolved_change }}%{% else %}▼ {{ r.kpis.resolved_change_abs }}%{% endif %}</span> vs. the {{ r.weeks }} weeks before{% else %}in the last {{ r.weeks }} weeks{% endif %}</span>
+    </div>
+    <div class="stat glass">
+      <span class="label">Median time to fix</span>
+      <b>{{ r.kpis.median }}</b>
+      <span class="sub">{% if r.kpis.median_change is not None %}<span class="delta {% if r.kpis.median_change <= 0 %}good{% else %}bad{% endif %}">{% if r.kpis.median_change <= 0 %}▼ {{ r.kpis.median_change_abs }}% faster{% else %}▲ {{ r.kpis.median_change }}% slower{% endif %}</span> than the {{ r.weeks }} weeks before{% else %}Half of tickets were fixed faster than this{% endif %}</span>
+    </div>
+    <div class="stat glass">
+      <span class="label">Fixed within a day</span>
+      <b>{% if r.kpis.within_day is not None %}{{ r.kpis.within_day }}%{% else %}—{% endif %}</b>
+      <span class="sub">of tickets resolved in this period</span>
+    </div>
+  </div>
+
+  <div class="report-grid">
+
+    {# ---------------------------------------------------------------- 3D #}
+    <section class="chart-card glass span-12" aria-labelledby="days-title">
+      <div class="chart-head">
+        <h2 id="days-title">Tickets per day <span class="tag">3D</span></h2>
+        <p>Drag to turn · arrow keys work too</p>
+      </div>
+      <p class="chart-sub">Each block is one day. Taller and darker means more tickets.{% if r.busiest %} Busiest day: <b>{{ r.busiest.label }}</b>, with {{ r.busiest.n }} ticket{{ r.busiest.n|pluralize }}{% if r.busiest.top %} (most were {{ r.busiest.top }}){% endif %}.{% endif %}</p>
+      <div class="b3d" id="chart-days" tabindex="0" role="img" aria-label="3D chart of tickets opened each day for the last {{ r.weeks }} weeks.{% if r.busiest %} The busiest day was {{ r.busiest.label }} with {{ r.busiest.n }} tickets.{% endif %} The same numbers are in the table below the chart."></div>
+      <div class="chart-foot">
+        <div class="b3d-controls" id="days-controls" hidden>
+          <button type="button" class="btn ghost small" data-act="flat" aria-pressed="false">Flat view</button>
+          <button type="button" class="btn ghost small" data-act="reset">Reset</button>
+        </div>
+        <span class="ramp" aria-hidden="true">Fewer<i class="seq-3"></i><i class="seq-4"></i><i class="seq-5"></i><i class="seq-6"></i><i class="seq-7"></i><i class="seq-8"></i>More</span>
+      </div>
+      <details class="table-view">
+        <summary>Show as a table</summary>
+        <div class="table-scroll">
+          <table class="plain">
+            <thead><tr><th scope="col">Week of</th>{% for d in r.chart_data.dayNames %}<th scope="col" class="n">{{ d }}</th>{% endfor %}<th scope="col" class="n">Total</th></tr></thead>
+            <tbody>
+              {% for w in r.day_grid %}
+              <tr><th scope="row">{{ w.label }}</th>{% for d in w.days %}<td class="n">{% if d.future %}<span class="muted">·</span>{% else %}{{ d.n }}{% endif %}</td>{% endfor %}<td class="n"><b>{{ w.total }}</b></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    {# ---------------------------------------------------------- portal #}
+    <section class="chart-card glass span-5" aria-labelledby="portal-title">
+      <div class="chart-head">
+        <h2 id="portal-title">Portal vs. phone</h2>
+        <p>How tickets came in</p>
+      </div>
+      <div class="hero">
+        <b class="hero-figure">{{ r.kpis.portal_share }}%</b>
+        <span>of tickets came in through the portal, not by phone or walk-up. That's <b>{{ r.kpis.portal_total }}</b> ticket{{ r.kpis.portal_total|pluralize }} nobody had to answer a call for.</span>
+      </div>
+      <h3 class="mini-head">Portal share by week{% if r.kpis.first_share is not None and r.kpis.last_share is not None %} · {{ r.kpis.first_share }}% → {{ r.kpis.last_share }}%{% endif %}</h3>
+      <div class="chart" id="chart-share" role="img" aria-label="Share of tickets from the portal each week{% if r.kpis.first_share is not None %}, from {{ r.kpis.first_share }}% in the first week to {{ r.kpis.last_share }}% in the latest week{% endif %}."></div>
+      <h3 class="mini-head">All channels</h3>
+      <div class="chart" id="chart-channels" role="img" aria-label="{% for c in r.channels %}{% if c.n %}{{ c.label }} {{ c.n }} ({{ c.pct }}%){% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}"></div>
+      <ul class="legend channel-legend">
+        {% for c in r.channels %}{% if c.n %}<li><i class="sw sw-{{ c.key }}"></i>{{ c.label }} <b>{{ c.n }}</b></li>{% endif %}{% endfor %}
+      </ul>
+      <details class="table-view">
+        <summary>Show as a table</summary>
+        <table class="plain">
+          <thead><tr><th scope="col">Week of</th><th scope="col" class="n">Portal</th><th scope="col" class="n">All tickets</th><th scope="col" class="n">Portal share</th></tr></thead>
+          <tbody>{% for w in r.week_list %}<tr><td>{{ w.label }}</td><td class="n">{{ w.portal }}</td><td class="n">{{ w.opened }}</td><td class="n">{% if w.share is not None %}{{ w.share }}%{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+        </table>
+        <table class="plain">
+          <thead><tr><th scope="col">Came in by</th><th scope="col" class="n">Tickets</th><th scope="col" class="n">Share</th></tr></thead>
+          <tbody>{% for c in r.channels %}<tr><td>{{ c.label }}</td><td class="n">{{ c.n }}</td><td class="n">{{ c.pct }}%</td></tr>{% endfor %}</tbody>
+        </table>
+      </details>
+    </section>
+
+    {# ------------------------------------------------- opened vs resolved #}
+    <section class="chart-card glass span-7" aria-labelledby="gap-title">
+      <div class="chart-head">
+        <h2 id="gap-title">Opened vs. resolved</h2>
+        <p>Per week · are we keeping up?</p>
+      </div>
+      <ul class="legend">
+        <li><i class="key-line c1"></i>Opened</li>
+        <li><i class="key-line c2"></i>Resolved</li>
+        <li><i class="key-area"></i>Shading shows which was higher</li>
+      </ul>
+      <div class="chart" id="chart-gap" role="img" aria-label="Tickets opened and resolved each week. The same numbers are in the table below."></div>
+      <details class="table-view">
+        <summary>Show as a table</summary>
+        <table class="plain">
+          <thead><tr><th scope="col">Week of</th><th scope="col" class="n">Opened</th><th scope="col" class="n">Resolved</th><th scope="col" class="n">Open tickets went</th></tr></thead>
+          <tbody>{% for w in r.week_list %}<tr><td>{{ w.label }}</td><td class="n">{{ w.opened }}</td><td class="n">{{ w.resolved }}</td><td class="n">{{ w.net }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </details>
+    </section>
+
+    {# ---------------------------------------------------------- punch #}
+    <section class="chart-card glass span-7" aria-labelledby="punch-title">
+      <div class="chart-head">
+        <h2 id="punch-title">When people ask for help</h2>
+        <p>Day of the week and hour</p>
+      </div>
+      <p class="chart-sub">{% if r.busiest_slot %}Busiest: <b>{{ r.busiest_slot.day }}, {{ r.busiest_slot.hours }}</b>. {% endif %}{% if r.after_hours %}{{ r.after_hours }} ticket{{ r.after_hours|pluralize }} came in outside office hours ({{ r.office_hours }}, Monday to Friday){% if r.after_hours %}, when no one was at the phone{% endif %}.{% endif %}</p>
+      <ul class="legend">
+        <li><i class="key-office"></i>Office hours</li>
+        <li>Bigger, darker dot = more tickets</li>
+      </ul>
+      <div class="chart" id="chart-punch" role="img" aria-label="Tickets by day of the week and hour of the day.{% if r.busiest_slot %} Busiest: {{ r.busiest_slot.day }}, {{ r.busiest_slot.hours }}.{% endif %} The same numbers are in the table below."></div>
+      <details class="table-view">
+        <summary>Show as a table</summary>
+        <div class="table-scroll">
+          <table class="plain compact">
+            <thead><tr><th scope="col">Day</th>{% for h in r.hour_labels %}<th scope="col" class="n">{{ h }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for row in r.punch_rows %}<tr><th scope="row">{{ row.day }}</th>{% for n in row.hours %}<td class="n">{% if n %}{{ n }}{% else %}<span class="muted">·</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    {# ----------------------------------------------------------- band #}
+    <section class="chart-card glass span-5" aria-labelledby="band-title">
+      <div class="chart-head">
+        <h2 id="band-title">Time to fix</h2>
+        <p>Per week</p>
+      </div>
+      <ul class="legend">
+        <li><i class="key-line c1"></i>Median: half were fixed faster</li>
+        <li><i class="key-band"></i>Middle half of tickets</li>
+      </ul>
+      <div class="chart" id="chart-band" role="img" aria-label="Weekly median time to fix tickets, with the range of the middle half of tickets. The same numbers are in the table below."></div>
+      <p class="chart-note">Short times get more room on this scale, so 10-minute fixes and 3-day fixes both fit.</p>
+      <details class="table-view">
+        <summary>Show as a table</summary>
+        <table class="plain">
+          <thead><tr><th scope="col">Week of</th><th scope="col" class="n">Fixed</th><th scope="col" class="n">Median</th><th scope="col" class="n">Middle half</th></tr></thead>
+          <tbody>{% for w in r.week_list %}<tr><td>{{ w.label }}</td><td class="n">{{ w.resolved }}</td><td class="n">{{ w.median_words }}</td><td class="n">{{ w.middle_words }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </details>
+    </section>
+
+    {# ----------------------------------------------------------- flow #}
+    <section class="chart-card glass span-12" aria-labelledby="flow-title">
+      <div class="chart-head">
+        <h2 id="flow-title">Where tickets go</h2>
+        <p>How they came in → which board → fixed or still open · hover a stream to follow it</p>
+      </div>
+      <div class="chart" id="chart-flow" role="img" aria-label="Flow of tickets from each channel to each board, then to fixed or still open. The same numbers are in the table below."></div>
+      <details class="table-view">
+        <summary>Show as a table</summary>
+        <table class="plain">
+          <thead><tr><th scope="col">Came in by</th><th scope="col">Board</th><th scope="col" class="n">Fixed</th><th scope="col" class="n">Still open</th></tr></thead>
+          <tbody>{% for row in r.flow_rows %}<tr><td>{{ row.source }}</td><td>{{ row.board }}</td><td class="n">{{ row.fixed }}</td><td class="n">{{ row.open }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </details>
+    </section>
+
+    {# ------------------------------------------------------ bar lists #}
+    {% include "staff/partials/barlist.html" with title="Open by board" rows=by_board empty="No open tickets." only %}
+    {% include "staff/partials/barlist.html" with title="Open by status" rows=by_status empty="No open tickets." only %}
+    {% include "staff/partials/barlist.html" with title="Open by person" rows=by_assignee empty="No open tickets." only %}
+    {% include "staff/partials/barlist.html" with title="Top problems" sub="Opened in this period" rows=by_category empty="No tickets in this period." only %}
+
+    {# --------------------------------------------------------- oldest #}
+    <section class="chart-card glass span-12" aria-labelledby="oldest-title">
+      <div class="chart-head"><h2 id="oldest-title">Oldest open tickets</h2></div>
+      {% if oldest %}
+      <div class="table-wrap">
+        <table class="tickets">
+          <thead><tr><th scope="col">#</th><th scope="col">Summary</th><th scope="col">Board</th><th scope="col">Status</th><th scope="col">Assignee</th><th scope="col">Age</th></tr></thead>
+          <tbody>
+          {% for t in oldest %}
+            <tr>
+              <td class="num"><a href="{% url 'staff:ticket' t.number %}">{{ t.number }}</a></td>
+              <td class="sum"><a href="{% url 'staff:ticket' t.number %}">{{ t.summary }}</a><span class="who">{{ t.requester_name }}</span></td>
+              <td class="muted">{{ t.board.name }}</td>
+              <td><span class="pill k-{{ t.status.kind }}">{{ t.status.name }}</span></td>
+              <td>{% if t.assignee %}{{ t.assignee.display_name }}{% else %}<span class="muted">—</span>{% endif %}</td>
+              <td class="age">{{ t.created_at|age }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<p class="muted">No open tickets.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{{ r.chart_data|json_script:"report-data" }}
 {% endblock %}
+{% block scripts %}<script src="{% static 'js/charts.js' %}" defer></script>{% endblock %}

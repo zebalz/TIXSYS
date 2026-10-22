@@ -1,4 +1,4 @@
-{% load static desk %}<!doctype html>
+{% load static %}<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -7,7 +7,7 @@
 <title>{% block title %}{{ org.portal_title }}{% endblock %} — {{ org.name }}</title>
 <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
 <link rel="stylesheet" href="{% static 'css/tixsys.css' %}">
-<style>:root{--brand:{{ org.brand_color|default:'#26232F' }};--brand-ink:{{ org.brand_color|default:'#26232F'|readable_on }};--accent:{{ org.header_color|default:'#CFC6FF' }};}</style>
+<link rel="stylesheet" href="{% url 'portal:brand_css' %}?v={{ brand_version }}">
 <script src="{% static 'js/boot.js' %}"></script>
 {% block head %}{% endblock %}
 </head>
@@ -15,5 +15,6 @@
 <a class="skip" href="#main">Skip to content</a>
 {% include "partials/icons.html" %}
 {% block body %}{% endblock %}
+<script src="{% static 'js/glass.js' %}" defer></script>
 </body>
 </html>

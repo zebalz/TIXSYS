@@ -3,7 +3,7 @@
 {% block content %}
 <div class="thread-head">
   <h1>Thanks</h1>
-  <p class="muted" style="margin:.4rem 0 0">Your request was received. If you don't hear back, call the help desk{% if org.help_phone %} at {{ org.help_phone }}{% endif %}.</p>
+  <p class="intro">Your request was received. If you don't hear back, call the help desk{% if org.help_phone %} at {{ org.help_phone }}{% endif %}.</p>
 </div>
 <a class="btn ghost" href="{% url 'portal:home' %}">Back to the help desk</a>
 {% endblock %}

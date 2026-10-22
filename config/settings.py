@@ -48,9 +48,7 @@ _host_only = SITE_HOST.split(":")[0]
 ALLOWED_HOSTS = [_host_only, "localhost", "127.0.0.1"] + [
     h.strip() for h in env("EXTRA_ALLOWED_HOSTS", "").split(",") if h.strip()
 ]
-CSRF_TRUSTED_ORIGINS = [SITE_URL] + [
-    o.strip() for o in env("EXTRA_TRUSTED_ORIGINS", "").split(",") if o.strip()
-]
+CSRF_TRUSTED_ORIGINS = [SITE_URL] + [o.strip() for o in env("EXTRA_TRUSTED_ORIGINS", "").split(",") if o.strip()]
 
 # --- Apps --------------------------------------------------------------------
 INSTALLED_APPS = [
@@ -60,6 +58,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     "helpdesk",
 ]
 
@@ -73,6 +72,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "helpdesk.middleware.CurrentOrganizationMiddleware",
+    "helpdesk.middleware.RequireAuthenticatorMiddleware",
     "helpdesk.middleware.SecurityHeadersMiddleware",
 ]
 
@@ -115,6 +115,9 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "tixsys_cache",
+        # Room for plenty of counters, so a flood of junk sign-ins can't push
+        # someone's lockout counter out of the cache.
+        "OPTIONS": {"MAX_ENTRIES": 100_000},
     }
 }
 
@@ -123,6 +126,17 @@ AUTH_USER_MODEL = "helpdesk.User"
 LOGIN_URL = "/staff/login/"
 LOGIN_REDIRECT_URL = "/staff/"
 LOGOUT_REDIRECT_URL = "/staff/login/"
+
+# Argon2 is the password hashing method recommended by OWASP; Django's
+# default (PBKDF2) stays listed so older hashes still check, then get upgraded.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+
+# Which staff must use an authenticator app: "admin" (default), "supervisors"
+# (supervisors and admins), "all", or "none".
+REQUIRE_AUTHENTICATOR_FOR = env("REQUIRE_AUTHENTICATOR_FOR", "admin").strip().lower()
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -214,5 +228,11 @@ LOGGING = {
         "django.request": {"level": "ERROR"},
         # Bots scanning the server's IP address trigger these constantly.
         "django.security.DisallowedHost": {"handlers": [], "propagate": False},
+        "tixsys.security": {"level": "INFO"},
     },
 }
+
+# `manage.py check --deploy` notes we've handled on purpose:
+# - SSL redirect (security.W008): Caddy, the web server in front, already sends every http:// visit to https://.
+# - HSTS preload/subdomains (W005, W021): left off so other sites on your domain aren't forced to HTTPS by this app.
+SILENCED_SYSTEM_CHECKS = ["security.W008", "security.W005", "security.W021"]

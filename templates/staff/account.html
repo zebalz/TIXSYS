@@ -2,9 +2,10 @@
 {% block page_title %}My account{% endblock %}
 {% block content %}
 <div class="form-page">
-  <div class="page-head"><h1>My account</h1></div>
+  <div class="page-head mb-m"><h1>My account</h1></div>
+  {% if authenticator_required %}<div class="notice">Your account needs an authenticator app before you can use the workspace. <a href="{% url 'staff:authenticator' %}">Set it up now</a>.</div>{% endif %}
   <form method="post" class="card">
-    <h2 style="margin-bottom:1rem">Profile</h2>
+    <h2>Profile</h2>
     {% csrf_token %}
     {% include "partials/form_errors.html" %}
     <div class="grid-2">
@@ -19,9 +20,9 @@
   </form>
 
   <section class="card">
-    <h2 style="margin-bottom:1rem">Sign-in security</h2>
-    <div class="panel" style="padding:0;background:none">
-      <dl style="margin-bottom:1.25rem">
+    <h2>Sign-in security</h2>
+    <div class="panel-plain">
+      <dl class="facts-list">
         <dt>Username</dt><dd>{{ user.username }}</dd>
         <dt>Role</dt><dd>{{ user.get_role_display }}</dd>
         <dt>Authenticator app</dt><dd>{% if user.totp_enabled %}On. A code is needed at sign-in.{% else %}Off{% endif %}</dd>

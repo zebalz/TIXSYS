@@ -7,7 +7,8 @@ history) and the demo.* staff accounts. Real tickets and accounts are kept.
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from helpdesk.models import Attachment, Ticket, User
+from helpdesk.management.commands.seed_demo import DEMO_CATEGORIES
+from helpdesk.models import Attachment, Category, Ticket, User
 
 
 class Command(BaseCommand):
@@ -30,6 +31,9 @@ class Command(BaseCommand):
             tickets.delete()
             user_count = users.count()
             users.delete()
+            Category.objects.filter(name__in=[name for name, _, _ in DEMO_CATEGORIES], tickets__isnull=True).delete()
         for f in files:
             f.file.delete(save=False)
-        self.stdout.write(self.style.SUCCESS(f"Removed {ticket_count} demo tickets and {user_count} demo staff accounts."))
+        self.stdout.write(
+            self.style.SUCCESS(f"Removed {ticket_count} demo tickets and {user_count} demo staff accounts.")
+        )

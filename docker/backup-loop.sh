@@ -24,7 +24,8 @@ make_backup() {
     echo "Backup FAILED at $stamp" >&2
   fi
   rm -rf "$work"
-  # Keep only the newest automatic backups.
+  # Keep only the newest automatic backups. (The names are our own, so ls is safe here.)
+  # shellcheck disable=SC2012
   ls -1t /backups/tixsys-auto-*.tar.gz 2>/dev/null | tail -n "+$((BACKUP_KEEP + 1))" | while read -r old; do
     rm -f "$old"
   done

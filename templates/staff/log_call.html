@@ -3,7 +3,7 @@
 {% block content %}
 <div class="form-page">
   <div class="page-head"><h1>Log a call</h1></div>
-  <p class="muted" style="margin-top:-.75rem">For calls, texts and walk-ups. The ticket gets a number and full history like any other.</p>
+  <p class="intro">For calls, texts and walk-ups. The ticket gets a number and full history like any other.</p>
   <form method="post" enctype="multipart/form-data" class="card">
     {% csrf_token %}
     {% include "partials/form_errors.html" %}
@@ -19,15 +19,15 @@
     </div>
     {% include "partials/field.html" with field=form.description %}
     <div class="field">
-      <label class="btn ghost small" for="{{ form.files.id_for_label }}" style="display:inline-flex"><svg class="i"><use href="#i-plus"/></svg>Attach files</label>
+      <label class="btn ghost small" for="{{ form.files.id_for_label }}"><svg class="i"><use href="#i-plus"/></svg>Attach files</label>
       {{ form.files }}
-      <ul class="file-list" data-file-list="{{ form.files.id_for_label }}" style="margin-top:.5rem"></ul>
+      <ul class="file-list mt-s" data-file-list="{{ form.files.id_for_label }}"></ul>
       <p class="help">Images or PDFs, up to {{ max_attachments }} files, {{ max_attachment_mb }} MB each.</p>
       {{ form.files.errors }}
     </div>
     {% include "partials/field.html" with field=form.assign_to_me %}
     <div class="form-actions">
-      <button class="btn" type="submit">Log ticket</button>
+      <button class="btn" type="submit" data-liquid>Log ticket</button>
       <a class="btn ghost" href="{% url 'staff:tickets' %}">Cancel</a>
     </div>
   </form>

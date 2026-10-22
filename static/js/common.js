@@ -75,9 +75,17 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
   }
 
+  // Forms that ask "are you sure?" first: <form data-confirm="Question?">
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    var question = form.getAttribute && form.getAttribute("data-confirm");
+    if (question && !window.confirm(question)) event.preventDefault();
+  }, true);
+
   // Don't send a form twice if someone double-clicks.
   document.querySelectorAll("form[method=post]").forEach(function (form) {
-    form.addEventListener("submit", function () {
+    form.addEventListener("submit", function (event) {
+      if (event.defaultPrevented) return;
       setTimeout(function () {
         form.querySelectorAll("button[type=submit]").forEach(function (b) { b.disabled = true; });
       }, 0);

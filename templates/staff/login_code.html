@@ -3,14 +3,14 @@
 {% block body_class %}staff{% endblock %}
 {% block body %}
 <main class="login-page" id="main">
-  <div class="login">
+  <div class="login glass">
     <h1>Enter your code</h1>
     <p class="sub">Open your authenticator app and enter the 6-digit code for this account.</p>
     <form method="post">
       {% csrf_token %}
       {% include "partials/form_errors.html" %}
       {% include "partials/field.html" with field=form.code %}
-      <button class="btn block" type="submit">Verify and sign in</button>
+      <button class="btn block" type="submit" data-liquid>Verify and sign in</button>
     </form>
     <p class="foot">Lost your phone? Ask the administrator to turn off your authenticator app.<br><a href="{% url 'staff:login' %}">Start over</a></p>
   </div>

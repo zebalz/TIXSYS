@@ -10,7 +10,8 @@ from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 
-from .models import Board, Category, Organization, Resource, Status, User
+from . import security_log
+from .models import Board, Category, Organization, Resource, SecurityEvent, Status, User
 
 
 class SettingsSite(admin.AdminSite):
@@ -158,9 +159,12 @@ class StaffAdmin(UserAdmin):
         updated = 0
         for user in queryset:
             user.totp_enabled = False
-            user.totp_secret = ""
+            user.totp_secret = ""  # erases the secret; not a password  # nosec B105
             user.totp_last_counter = 0
             user.save(update_fields=["totp_enabled", "totp_secret", "totp_last_counter"])
+            security_log.record(
+                request, SecurityEvent.AUTHENTICATOR_RESET, user=request.user, detail=f"for {user.username}"
+            )
             updated += 1
         self.message_user(request, f"Turned off the authenticator app for {updated} account(s).")
 
@@ -179,4 +183,26 @@ class StaffAdmin(UserAdmin):
 
     def has_delete_permission(self, request, obj=None):
         # Keep history intact: turn accounts off (Active) instead of deleting.
+        return False
+
+
+@admin.register(SecurityEvent, site=settings_site)
+class SecurityEventAdmin(admin.ModelAdmin):
+    """Read-only security log: sign-ins, failures, lockouts, authenticator changes, exports."""
+
+    list_display = ("created_at", "kind", "username", "ip", "detail")
+    list_filter = ("kind",)
+    search_fields = ("username", "ip", "detail")
+    date_hierarchy = "created_at"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(organization=request.org)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
