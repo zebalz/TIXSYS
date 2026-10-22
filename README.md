@@ -149,7 +149,7 @@ Python 3.13, Django 5.2 (long-term support), PostgreSQL 16 with full-text search
 
 Checks:
 ```
-python manage.py test helpdesk     # 84 tests, including the security tests in helpdesk/tests/test_security.py
+python manage.py test helpdesk     # 92 tests, including the security tests in helpdesk/tests/test_security.py
 ruff check .
 pip-audit -r requirements.txt
 bandit -r helpdesk config -x helpdesk/tests,helpdesk/migrations

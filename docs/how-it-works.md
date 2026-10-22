@@ -96,6 +96,6 @@ Before: run `./tixsys demo` (it prints a password for the demo accounts) and ope
    - Drag the 3D chart around. The tall tower is the day email went down: a dozen tickets in one morning.
    - "Portal vs. phone": the share of tickets coming through the portal instead of calls, week by week.
    - "Time to fix" and "Opened vs. resolved": are we keeping up?
-7. Close with [SECURITY.md](../SECURITY.md): 39 security tests, clean scans, runs on our own server, no outside services.
+7. Close with [SECURITY.md](../SECURITY.md): 47 security tests, clean scans, an internal review whose four findings are fixed, runs on our own server, no outside services.
 
 Afterwards, `./tixsys clear-demo` removes the demo tickets and accounts and keeps anything real.
