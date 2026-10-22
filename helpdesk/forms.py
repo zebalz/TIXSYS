@@ -126,7 +126,8 @@ class CodeForm(forms.Form):
 
     def clean_code(self):
         code = self.cleaned_data["code"].strip().replace(" ", "")
-        if not code.isdigit():
+        # isascii() too: isdigit() alone also accepts look-alikes such as "²" and full-width digits.
+        if not (code.isascii() and code.isdigit()):
             raise forms.ValidationError("Enter the 6 numbers from your authenticator app.")
         return code
 

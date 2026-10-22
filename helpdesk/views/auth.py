@@ -36,32 +36,33 @@ def login_view(request):
     if request.method == "POST" and form.is_valid():
         username = form.cleaned_data["username"]
         ip = throttle.client_ip(request)
-        try:
-            throttle.check_sign_in_allowed(username, ip)
-        except throttle.SignInBlocked as blocked:
-            security_log.record(request, SecurityEvent.LOGIN_BLOCKED, username=username)
-            form.add_error(None, blocked.message)
-        else:
-            user = authenticate(request, username=username, password=form.cleaned_data["password"])
-            if user is None:
-                throttle.record_failure(username, ip)
-                security_log.record(request, SecurityEvent.LOGIN_FAILED, username=username)
-                form.add_error(None, "That username and password don't match. Check them and try again.")
-            elif user.totp_enabled:
-                request.session.cycle_key()
-                request.session[PENDING_KEY] = {
-                    "user": user.pk,
-                    "username": user.username,
-                    "backend": user.backend,
-                    "at": time.time(),
-                    "next": _safe_next(request, settings.LOGIN_REDIRECT_URL),
-                }
-                return redirect("staff:login_code")
+        with throttle.sign_in_turn(username):
+            try:
+                throttle.check_sign_in_allowed(username, ip)
+            except throttle.SignInBlocked as blocked:
+                security_log.record(request, SecurityEvent.LOGIN_BLOCKED, username=username)
+                form.add_error(None, blocked.message)
             else:
-                throttle.record_success(username)
-                login(request, user)
-                security_log.record(request, SecurityEvent.LOGIN_OK, user=user, detail="password")
-                return redirect(_safe_next(request, settings.LOGIN_REDIRECT_URL))
+                user = authenticate(request, username=username, password=form.cleaned_data["password"])
+                if user is None:
+                    throttle.record_failure(username, ip)
+                    security_log.record(request, SecurityEvent.LOGIN_FAILED, username=username)
+                    form.add_error(None, "That username and password don't match. Check them and try again.")
+                elif user.totp_enabled:
+                    request.session.cycle_key()
+                    request.session[PENDING_KEY] = {
+                        "user": user.pk,
+                        "username": user.username,
+                        "backend": user.backend,
+                        "at": time.time(),
+                        "next": _safe_next(request, settings.LOGIN_REDIRECT_URL),
+                    }
+                    return redirect("staff:login_code")
+                else:
+                    throttle.record_success(username)
+                    login(request, user)
+                    security_log.record(request, SecurityEvent.LOGIN_OK, user=user, detail="password")
+                    return redirect(_safe_next(request, settings.LOGIN_REDIRECT_URL))
     return render(request, "staff/login.html", {"form": form, "next": request.GET.get("next", "")})
 
 
@@ -76,24 +77,25 @@ def login_code_view(request):
     if request.method == "POST" and form.is_valid():
         ip = throttle.client_ip(request)
         username = pending["username"]
-        try:
-            throttle.check_sign_in_allowed(username, ip)
-        except throttle.SignInBlocked as blocked:
-            security_log.record(request, SecurityEvent.LOGIN_BLOCKED, username=username)
-            form.add_error(None, blocked.message)
-        else:
-            user = User.objects.filter(pk=pending["user"], is_active=True).first()
-            if user and totp.verify_for_user(user, form.cleaned_data["code"]):
-                throttle.record_success(username)
-                request.session.pop(PENDING_KEY, None)
-                login(request, user, backend=pending["backend"])
-                security_log.record(
-                    request, SecurityEvent.LOGIN_OK, user=user, detail="password and authenticator code"
-                )
-                return redirect(pending.get("next") or settings.LOGIN_REDIRECT_URL)
-            throttle.record_failure(username, ip)
-            security_log.record(request, SecurityEvent.CODE_FAILED, user=user, username=username)
-            form.add_error("code", "That code didn't work. Codes change every 30 seconds; enter the current one.")
+        with throttle.sign_in_turn(username):
+            try:
+                throttle.check_sign_in_allowed(username, ip)
+            except throttle.SignInBlocked as blocked:
+                security_log.record(request, SecurityEvent.LOGIN_BLOCKED, username=username)
+                form.add_error(None, blocked.message)
+            else:
+                user = User.objects.filter(pk=pending["user"], is_active=True).first()
+                if user and totp.verify_for_user(user, form.cleaned_data["code"]):
+                    throttle.record_success(username)
+                    request.session.pop(PENDING_KEY, None)
+                    login(request, user, backend=pending["backend"])
+                    security_log.record(
+                        request, SecurityEvent.LOGIN_OK, user=user, detail="password and authenticator code"
+                    )
+                    return redirect(pending.get("next") or settings.LOGIN_REDIRECT_URL)
+                throttle.record_failure(username, ip)
+                security_log.record(request, SecurityEvent.CODE_FAILED, user=user, username=username)
+                form.add_error("code", "That code didn't work. Codes change every 30 seconds; enter the current one.")
     return render(request, "staff/login_code.html", {"form": form})
 
 

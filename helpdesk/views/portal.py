@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from .. import services, throttle
 from ..forms import EmailLinksForm, ReplyForm, SubmitTicketForm, form_stamp
 from ..models import Attachment, Note, Resource, Ticket, User
+from ..uploads import LOGO_TYPES, detected_type
 
 MINE_COOKIE = "tixsys_mine"
 MINE_SALT = "tixsys.portal.mine"
@@ -234,7 +235,13 @@ def logo(request):
         handle = org.logo.open("rb")
     except FileNotFoundError:
         raise Http404 from None
-    response = FileResponse(handle)
+    # The type comes from the file's contents, never its name, and only pictures are served.
+    content_type = detected_type(handle)
+    if content_type not in LOGO_TYPES:
+        handle.close()
+        raise Http404
+    response = FileResponse(handle, content_type=content_type)
+    response.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
 

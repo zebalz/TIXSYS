@@ -4,14 +4,17 @@ page (so the authenticator code is never skipped)."""
 
 from urllib.parse import quote
 
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.core.exceptions import PermissionDenied
+from django.core.files.uploadedfile import UploadedFile
 from django.shortcuts import redirect
 
 from . import security_log
 from .models import Board, Category, Organization, Resource, SecurityEvent, Status, User
+from .uploads import check_logo
 
 
 class SettingsSite(admin.AdminSite):
@@ -61,8 +64,17 @@ class OrgScopedAdmin(admin.ModelAdmin):
         return super().get_queryset(request).filter(organization=request.org)
 
 
+class OrganizationForm(forms.ModelForm):
+    def clean_logo(self):
+        logo = self.cleaned_data.get("logo")
+        if isinstance(logo, UploadedFile):  # a new upload; an unchanged logo was checked when it was added
+            check_logo(logo)
+        return logo
+
+
 @admin.register(Organization, site=settings_site)
 class OrganizationAdmin(admin.ModelAdmin):
+    form = OrganizationForm
     list_display = ("name", "portal_title", "help_phone")
     fieldsets = (
         ("Name", {"fields": ("name", "portal_title")}),

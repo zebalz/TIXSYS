@@ -1,9 +1,19 @@
-"""Counters for sign-in lockout and portal rate limits, kept in the shared cache."""
+"""Counters for sign-in lockout and portal rate limits, kept in the shared cache.
 
+The server runs several app workers side by side, so two requests can touch the
+same counter at the same moment. Each counter change, and each whole sign-in
+attempt, holds a lock in the database while it runs, so nothing goes uncounted."""
+
+import hashlib
 import time
+from contextlib import contextmanager
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import DatabaseError, connection
+
+# The cache stores keys of up to 250 characters, including what Django adds in front.
+MAX_KEY_LENGTH = 200
 
 
 def client_ip(request):
@@ -16,18 +26,43 @@ def client_ip(request):
 
 
 def _full(key):
-    return f"tixsys:{key}"
+    key = f"tixsys:{key}"
+    if len(key) > MAX_KEY_LENGTH:
+        # A key that long (a 300-character email address can make one) wouldn't be
+        # stored at all, so its counter would never count. A fixed-length digest always fits.
+        key = "tixsys:sha256:" + hashlib.sha256(key.encode()).hexdigest()
+    return key
+
+
+@contextmanager
+def one_at_a_time(key):
+    """Runs the block while holding a database lock named after the key. A request in any
+    app worker that wants the same key waits until the block ends. (A PostgreSQL advisory
+    lock: it locks a name, not a table, and the database frees it if the app worker dies.)"""
+    lock_id = int.from_bytes(hashlib.sha256(_full(key).encode()).digest()[:8], "big", signed=True)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_lock(%s)", [lock_id])
+    try:
+        yield
+    finally:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_advisory_unlock(%s)", [lock_id])
+        except DatabaseError:
+            # The connection broke during the block. Closing it frees the lock for sure.
+            connection.close()
 
 
 def count(key, window_seconds):
     """Add one to a counter that resets window_seconds after its first hit. Returns the new count."""
-    now = time.time()
-    data = cache.get(_full(key))
-    if not data or data[1] <= now:
-        data = (0, now + window_seconds)
-    data = (data[0] + 1, data[1])
-    cache.set(_full(key), data, max(1, int(data[1] - now) + 1))
-    return data[0]
+    with one_at_a_time(key):
+        now = time.time()
+        data = cache.get(_full(key))
+        if not data or data[1] <= now:
+            data = (0, now + window_seconds)
+        data = (data[0] + 1, data[1])
+        cache.set(_full(key), data, max(1, int(data[1] - now) + 1))
+        return data[0]
 
 
 def peek(key):
@@ -55,6 +90,13 @@ class SignInBlocked(Exception):
 
 def _name(username):
     return (username or "").strip().lower()
+
+
+def sign_in_turn(username):
+    """Sign-in attempts for one username take turns, from the lockout check through the
+    password (or code) check to counting a failure. Without this, a burst of guesses sent
+    at the same moment would all pass the check before any of them was counted."""
+    return one_at_a_time(f"sign-in:{_name(username)}")
 
 
 def _until(key):

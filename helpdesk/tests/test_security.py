@@ -9,18 +9,23 @@ import secrets
 import struct
 import subprocess
 import sys
+import threading
 import zlib
 from pathlib import Path
 
 import pyotp
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, override_settings
+from django.db import connection
+from django.test import Client, TransactionTestCase, override_settings
 from django.urls import reverse
 
-from helpdesk import services
+from helpdesk import services, throttle, totp
+from helpdesk.bootstrap import ensure_defaults
 from helpdesk.models import Attachment, Note, SecurityEvent, Ticket, User
 from helpdesk.tests.test_flows import Base, old_stamp, png_bytes
 
@@ -292,6 +297,11 @@ class InputHandlingTests(Base):
             self.assertEqual(response.status_code, 302)
             self.assertEqual(response["Location"], "/staff/", target)
 
+    def test_very_long_rate_limit_keys_still_count(self):
+        # A valid email address can be 300 characters; its counter must still count.
+        key = "portal-submit:email:" + "a" * 300 + "@example.org"
+        self.assertEqual([throttle.count(key, 60) for _ in range(3)], [1, 2, 3])
+
     def test_unknown_host_names_are_refused(self):
         response = self.client.get("/", HTTP_HOST="evil.example")
         self.assertEqual(response.status_code, 400)
@@ -353,6 +363,44 @@ class FileUploadTests(Base):
         self.assertEqual(response["Content-Type"], "image/png")
         self.assertTrue(pdf_att.file.name.startswith("attachments/"))
         self.assertNotIn("report", Path(pdf_att.file.name).name)  # stored under a random name
+
+    def logo_form(self, logo):
+        fields = {
+            "name": self.org.name,
+            "portal_title": self.org.portal_title,
+            "brand_color": "#26232F",
+            "header_color": "#CFC6FF",
+            "help_phone": "",
+            "welcome_text": "",
+            "remote_help_text": "",
+            "allowed_email_domain": "",
+            "logo": logo,
+        }
+        return self.client.post(f"/staff/settings/helpdesk/organization/{self.org.pk}/change/", fields)
+
+    def test_logo_must_be_a_real_picture(self):
+        self.login(self.admin)
+        # A real picture with a name that would make browsers treat it as a PDF.
+        response = self.logo_form(SimpleUploadedFile("logo.pdf", png_bytes(), content_type="application/pdf"))
+        self.assertEqual(response.status_code, 200)
+        self.org.refresh_from_db()
+        self.assertFalse(self.org.logo)
+        response = self.logo_form(SimpleUploadedFile("logo.png", png_bytes(), content_type="image/png"))
+        self.assertEqual(response.status_code, 302)
+        self.org.refresh_from_db()
+        response = self.client.get(reverse("portal:logo"))
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertIn("sandbox", response["Content-Security-Policy"])
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+
+    def test_logo_is_only_served_as_a_picture(self):
+        # Whatever ends up in the logo's place (an old upload, a restored backup), only a
+        # real picture is ever served, with its type taken from its contents, not its name.
+        self.org.logo.save("logo.pdf", ContentFile(png_bytes()), save=True)
+        response = self.client.get(reverse("portal:logo"))
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.org.logo.save("logo.png", ContentFile(b"%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF"), save=True)
+        self.assertEqual(self.client.get(reverse("portal:logo")).status_code, 404)
 
 
 class BrowserProtectionTests(Base):
@@ -481,6 +529,21 @@ class AccountSecurityTests(Base):
             signed_in = "_auth_user_id" in client.session
             self.assertEqual(signed_in, attempt == 0)
 
+    def test_a_code_cannot_be_used_twice_even_by_sign_ins_at_the_same_moment(self):
+        # Two sign-ins that both loaded the account before either one checked the code.
+        first = User.objects.get(pk=self.admin.pk)
+        second = User.objects.get(pk=self.admin.pk)
+        code = pyotp.TOTP(self.admin_secret).now()
+        self.assertTrue(totp.verify_for_user(first, code))
+        self.assertFalse(totp.verify_for_user(second, code))
+
+    def test_odd_characters_in_a_code_are_refused_cleanly(self):
+        self.client.post("/staff/login/", {"username": "admin", "password": "Correct-Horse-9"})
+        for odd in ("²²²²²²", "１２３４５６", "12 34 5"):
+            response = self.client.post(reverse("staff:login_code"), {"code": odd})
+            self.assertEqual(response.status_code, 200, odd)
+            self.assertNotIn("_auth_user_id", self.client.session)
+
     def test_security_log_is_read_only(self):
         self.client.post("/staff/login/", {"username": "tech", "password": "nope"})
         event = SecurityEvent.objects.get()
@@ -513,3 +576,83 @@ class AccountSecurityTests(Base):
         self.assertTrue(
             SecurityEvent.objects.filter(kind=SecurityEvent.AUTHENTICATOR_RESET, detail="for tech").exists()
         )
+
+
+@override_settings(
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    },
+    TRUST_X_FORWARDED_FOR=False,
+    LOGIN_SLOWDOWN_AFTER=100,
+    LOGIN_LOCKOUT_AFTER=4,
+)
+class SimultaneousRequestTests(TransactionTestCase):
+    """Requests that arrive at the same moment, the way they do on the server, where
+    several app workers answer requests side by side. Each test starts real threads,
+    each with its own database connection, and lets them all go at once."""
+
+    def setUp(self):
+        cache.clear()
+        self.org = ensure_defaults()
+        self.user = User.objects.create_user(
+            username="racer", password="Correct-Horse-9", role=User.TECHNICIAN, organization=self.org
+        )
+
+    def tearDown(self):
+        cache.clear()  # these tests commit their counters; don't leave them for other tests
+
+    def all_at_once(self, count, work):
+        """Runs work(i) for i in range(count), each in its own thread, all released together."""
+        start = threading.Barrier(count)
+        results = [None] * count
+        errors = []
+
+        def run(i):
+            try:
+                start.wait()
+                results[i] = work(i)
+            except Exception as e:  # noqa: BLE001 - reported by the assertion below
+                errors.append(e)
+            finally:
+                connection.close()
+
+        threads = [threading.Thread(target=run, args=(i,)) for i in range(count)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(errors, [])
+        return results
+
+    def test_simultaneous_hits_on_a_rate_limit_are_all_counted(self):
+        results = self.all_at_once(10, lambda i: [throttle.count("race-test", 60) for _ in range(5)])
+        every_count = sorted(n for counts in results for n in counts)
+        self.assertEqual(every_count, list(range(1, 51)))  # 50 hits, each counted exactly once
+
+    def test_simultaneous_wrong_passwords_cannot_slip_past_the_lockout(self):
+        def guess(i):
+            return Client().post("/staff/login/", {"username": "racer", "password": f"wrong-guess-{i}"})
+
+        self.all_at_once(8, guess)
+        # Each "wrong password" log entry is a password that was really checked.
+        checked = SecurityEvent.objects.filter(kind=SecurityEvent.LOGIN_FAILED, username="racer").count()
+        self.assertEqual(checked, 4)  # LOGIN_LOCKOUT_AFTER; the other 4 guesses were refused unchecked
+        response = Client().post("/staff/login/", {"username": "racer", "password": "Correct-Horse-9"})
+        self.assertContains(response, "locked")
+
+    def test_one_authenticator_code_signs_in_once_even_when_sent_twice_at_once(self):
+        secret = pyotp.random_base32()
+        self.user.totp_secret = secret
+        self.user.totp_enabled = True
+        self.user.save()
+        clients = [Client() for _ in range(4)]
+        for client in clients:
+            client.post("/staff/login/", {"username": "racer", "password": "Correct-Horse-9"})
+        code = pyotp.TOTP(secret).now()
+
+        def send_code(i):
+            clients[i].post(reverse("staff:login_code"), {"code": code})
+            return "_auth_user_id" in clients[i].session
+
+        self.assertEqual(sorted(self.all_at_once(4, send_code)), [False, False, False, True])

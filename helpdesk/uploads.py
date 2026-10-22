@@ -22,6 +22,7 @@ EXTENSIONS = {
 }
 MAX_PIXELS = 40_000_000  # about 8000 x 5000; bigger than any real screenshot
 ACCEPT_ATTR = ".png,.jpg,.jpeg,.gif,.webp,.pdf,image/png,image/jpeg,image/gif,image/webp,application/pdf"
+LOGO_TYPES = ("image/png", "image/jpeg", "image/gif", "image/webp")
 
 
 def detected_type(uploaded):
@@ -63,6 +64,14 @@ def check_file(uploaded):
             raise forms.ValidationError(f"{name} looks damaged or too large and can't be used as an image.") from None
         finally:
             uploaded.seek(0)
+    return uploaded
+
+
+def check_logo(uploaded):
+    """The portal logo: the same checks as attachments, and it must be a picture."""
+    check_file(uploaded)
+    if detected_type(uploaded) not in LOGO_TYPES:
+        raise forms.ValidationError("Use a PNG, JPG, GIF or WEBP picture for the logo.")
     return uploaded
 
 

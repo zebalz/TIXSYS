@@ -1,6 +1,7 @@
 """Authenticator-app codes (TOTP). Works with Microsoft Authenticator, Google
 Authenticator, 1Password and others. No outside service is involved."""
 
+import hmac
 import io
 import time
 
@@ -37,18 +38,29 @@ def matching_counter(secret, code, now=None):
     totp = pyotp.TOTP(secret)
     current = int(now // STEP)
     for counter in (current, current - 1, current + 1):
-        if totp.generate_otp(counter) == code:
+        # Compared in constant time, so response timing gives nothing away.
+        if hmac.compare_digest(totp.generate_otp(counter).encode(), str(code).encode()):
             return counter
     return None
 
 
 def verify_for_user(user, code):
-    """Checks a code and refuses one that was already used."""
+    """Checks a code and refuses one that was already used.
+
+    The database checks "not used yet" and records the use in one statement, so two
+    sign-ins sending the same code at the same moment can't both get in."""
     if not user.totp_secret:
         return False
     counter = matching_counter(user.totp_secret, code)
-    if counter is None or counter <= user.totp_last_counter:
+    if counter is None:
+        return False
+    not_used_yet = type(user).objects.filter(
+        pk=user.pk,
+        totp_enabled=True,
+        totp_secret=user.totp_secret,  # still the secret this code was checked against
+        totp_last_counter__lt=counter,
+    )
+    if not not_used_yet.update(totp_last_counter=counter):
         return False
     user.totp_last_counter = counter
-    user.save(update_fields=["totp_last_counter"])
     return True
